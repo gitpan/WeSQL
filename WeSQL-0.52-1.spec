@@ -1,4 +1,4 @@
-%define ver     0.51
+%define ver     0.52
 %define rel     1
 %define name    WeSQL
 %define rlname  %{name}
@@ -18,7 +18,7 @@ Name: %name
 Version: %ver
 Release: %rel
 Copyright: %{copy}
-Packager: Ward Vandewege <ward@pong.be>
+Packager: Ward Vandewege <w@wesql.org>
 Source: %{source0}
 URL: %{url}
 Group: %{group}
@@ -48,7 +48,7 @@ elif [ $(perl -e 'print index($INC[0],"%{prefix}/lib/perl");') -eq 0 ];then
 else
     # package must go somewhere else (eg. /opt), so leave off the perl
     # versioning to ease integration with automatic profile generation scripts
-    # if this is really a perl-version dependant package you should not omiss
+    # if this is really a perl-version dependant package you should not omit
     # the version info...
     inst_method="makemaker-site"
     CFLAGS=$RPM_OPT_FLAGS 
@@ -85,9 +85,11 @@ find $RPM_BUILD_ROOT -type f -print|sed -e "s@^$RPM_BUILD_ROOT@@g" > %{filelst}
 rm -rf $RPM_BUILD_ROOT
 
 %files -f %{filelst}
-%doc COPYING README CREDITS addressbook html %{name}-%{ver}-%{rel}.spec
+%doc COPYING README CREDITS addressbook html utils %{name}-%{ver}-%{rel}.spec
 
 %changelog
+* Wed May 19 2002 Ward Vandewege <ward@pong.be>
+	Updated to version 0.52
 * Sun Feb 10 2002 Ward Vandewege <ward@pong.be>
 	Updated to version 0.51
 * Tue Nov 20 2001 Ward Vandewege <ward@pong.be>

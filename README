@@ -1,4 +1,4 @@
-Apache::WeSQL version 0.51
+Apache::WeSQL version 0.52
 ==========================
 
 The Web-enabled SQL (WeSQL) Apache mod_perl module is an extension to HTML, 
@@ -40,7 +40,7 @@ several Perl modules (do yourself a favour and get the latest versions!):
 DBI
 Data-ShowTable
 ApacheDBI
-Msql-Mysql-modules or DBD-Pg
+DBI-Mysql or DBD-Pg
 
 But if you are brave, there is no reason why WeSQL should not run on any system 
 with any webserver that can execute Perl code as cgi-scripts, and can connect to a 

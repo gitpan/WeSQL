@@ -12,14 +12,14 @@ use Apache::WeSQL::Auth qw(:all);
 use Apache::WeSQL::Session qw(:all);
 
 use Apache::Constants qw(:common);
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 # Some global variables
 
 our $conf_file_contents = "";
 our @commandlist = ();
 our ($r,$dbtype,$dsn,$dbuser,$dbpass,$dbh);
-our ($authenticate,$noauthurls,$authurls,$authsuperuser,$authsuperuserdir);
+our ($authenticate,$noauthurls,$authurls,$authsuperuser,$authsuperuserdir,$defaultlanguage);
 
 # Preloaded methods go here.
 
@@ -52,17 +52,27 @@ sub handler {
 	$dbh = &sqlConnect($dsn,$dbuser,$dbpass,$dbtype) if (!defined($dbh));
 	&Apache::WeSQL::log_error("$$: connected to $dsn") if ($Apache::WeSQL::DEBUG);
 
-	# Get the GET/POST parameters
-	# getparams fills in the global %params and %cookies hashes
-	&Apache::WeSQL::getparams($dbh);
-
 	# Make sure we have a session hash!
-	my $cookieheader = &Apache::WeSQL::Session::session($dbh,$r->uri);
+	my $cookieheader = &Apache::WeSQL::Session::session($dbh);
+
+  &Apache::WeSQL::log_error("$$: AddrHandler: default language setting: $defaultlanguage") if ($Apache::WeSQL::DEBUG);
+
+	# Get the GET/POST parameters
+	# getparams fills in the global %params and %cookies hashes, and gets the session language
+	&Apache::WeSQL::getparams($dbh,'',$cookieheader,$defaultlanguage);
+
+	my $uri = $r->uri;
+	$uri .= "index.wsql" if ($uri =~ /\/$/);
+
+	# Multi-language support
+	$uri =~ s/\.[\w\-]{2,5}\.wsql$/\.wsql/;
+
+	&Apache::WeSQL::log_error("$$: AppHandler: authenticate setting: $authenticate") if ($Apache::WeSQL::DEBUG);
 
 	# First check the authentication of the user!
-	&Apache::WeSQL::Auth::authenticate($dbh,$authsuperuserdir,$authsuperuser) if ($authenticate && !($r->uri =~ /^($noauthurls)$/));
+	&Apache::WeSQL::Auth::authenticate($dbh,$authsuperuserdir,$authsuperuser) if ($authenticate && !($uri =~ /^($noauthurls)$/));
 
-	&Apache::WeSQL::log_error("$$: parsing " . $r->uri) if ($Apache::WeSQL::DEBUG);
+	&Apache::WeSQL::log_error("$$: AppHandler: parsing " . $r->uri) if ($Apache::WeSQL::DEBUG);
 
 	# Call WeSQL to do its thing!
 	&Apache::WeSQL::display($dbh,$r,$authsuperuserdir,$cookieheader,@commandlist);
@@ -104,7 +114,7 @@ For more information about running several WeSQL sites on 1 Apache server, see t
 Apart from a sub to read the configuration file, there is no intelligence in this
 module. All calls are handled by Apache::WeSQL and its helper modules.
 
-This module is part of the WeSQL package, version 0.51
+This module is part of the WeSQL package, version 0.52
 
 (c) 2000-2002 by Ward Vandewege. This program is free software; you can redistribute it and/or modify it under the terms of the GPL.
 

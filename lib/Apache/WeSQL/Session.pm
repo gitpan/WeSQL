@@ -23,7 +23,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 # Preloaded methods go here.
 ############################################################
@@ -35,12 +35,23 @@ our $VERSION = '0.51';
 ############################################################
 sub session {
 	my $dbh = shift;
-	my $uri = shift;
 	my @session;
-	if (defined($Apache::WeSQL::cookies{session})) {
-		@session = &sqlSelect($dbh,"select id from sessions where hash='$Apache::WeSQL::cookies{session}' and status='1'");
+
+	# This sub is called from AppHandler.pm _before_ getparams is called, hence _before_ 
+	# the %cookies hash is initialised. So get the cookie manually! It's ugly, but the 
+	# only solution to the chicken and egg problem where we need the session hash string in
+	# WeSQL::getparams, and need the cookies hash here...
+  my $r = Apache->request;
+  require CGI;
+  my $q = new CGI;
+  my $sessioncookie = $q->cookie('session');
+
+	if (defined($sessioncookie)) {
+		&Apache::WeSQL::log_error("$$: Session: session cookie exists, let's check it against the db") if ($Apache::WeSQL::DEBUG);
+		@session = &sqlSelect($dbh,"select id from sessions where hash='$sessioncookie' and status='1'");
 	}
-	if (!defined($Apache::WeSQL::cookies{session}) || !defined($session[0])) {
+	if (!defined($sessioncookie) || !defined($session[0])) {
+		&Apache::WeSQL::log_error("$$: Session: building new session hash") if ($Apache::WeSQL::DEBUG);
 		# Calculate hash
 		my $hashstr = join ('', ('.', '/', 0..9, 'A'..'Z', 'a'..'z')[rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64]);
 		# Store it in the database
@@ -48,7 +59,6 @@ sub session {
 		my @vals = ($hashstr);
 		&Apache::WeSQL::Journalled::jAdd($dbh,"sessions",\@cols,\@vals,'id');
 		# And make the client set it as a cookie
-#		&Apache::WeSQL::redirect($uri,"Set-Cookie: session=$hashstr");		# Note that this will loose any POST-ed values...
 		return "Set-Cookie: session=$hashstr";
 	} 
 }
@@ -124,8 +134,9 @@ sub sRead {
 	my ($dbh,$key,$sort) = @_;
 	$sort ||= 0;
 	my @session = &sqlSelect($dbh,"select id from sessions where hash='$Apache::WeSQL::cookies{session}' and status='1'");
-	my @result = &sqlSelect($dbh,"select value from sessiondata where sessionid='$session[0]' and name='$key' and status='1' order by id " . ($sort == 1?"DESC":""));
 	&Apache::WeSQL::log_error("$$: sRead: read session data '$key' for session $session[0], " . ($sort == 1?"last added value":"oldest value")) if ($Apache::WeSQL::DEBUG);
+	my @result = &sqlSelect($dbh,"select value from sessiondata where sessionid='$session[0]' and name='$key' and status='1' order by id " . ($sort == 1?"DESC":""));
+	&Apache::WeSQL::log_error("$$: sRead: session data '$key' for session $session[0] doesn't exist!") if ($Apache::WeSQL::DEBUG && ($#result == -1));
 	return undef if ($#result == -1);
 	return $result[0];
 }
@@ -139,7 +150,7 @@ sub sReadAllCore {
 	$sort ||= 0;
 	my @session = &sqlSelect($dbh,"select id from sessions where hash='$Apache::WeSQL::cookies{session}' and status='1'");
 	my $c = &sqlSelectMany($dbh,"select name,value from sessiondata where sessionid='$session[0]' and $condition and status='1' order by id " . ($sort == 1?"DESC":""));
-	&Apache::WeSQL::log_error("$$: sReadAll: read session data where $condition for session $session[0], order" . ($sort == 1?"LIFO":"FIFO")) if ($Apache::WeSQL::DEBUG);
+	&Apache::WeSQL::log_error("$$: sReadAll: read session data where $condition for session $session[0], order " . ($sort == 1?"LIFO":"FIFO")) if ($Apache::WeSQL::DEBUG);
 	return $c;
 }
 
@@ -265,7 +276,7 @@ This module also contains some code for storing and retrieving data in a user se
 
       sessionid bigint(20) unsigned not null,
       name varchar(50) default '' not null,
-      value varchar(255) default '' not null,
+      value text default '' not null,
       primary key (pkey)
     );
 
@@ -290,7 +301,7 @@ The sessions work by storing a cookie with a unique value on the user's computer
 
 For more information, have a look at the source code of the Apache::WeSQL::Session module.
 
-This module is part of the WeSQL package, version 0.51
+This module is part of the WeSQL package, version 0.52
 
 (c) 2000-2002 by Ward Vandewege
 

@@ -22,7 +22,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 # Preloaded methods go here.
 ############################################################
@@ -42,22 +42,23 @@ sub authenticate {
 	# Superuser directory or not?
 	my $r = Apache->request;
 	&Apache::WeSQL::log_error("$$: Auth.pm: authenticate: called with sudir: $superuserdir, authsuper: $authsuper and uri: " . $r->uri) if ($Apache::WeSQL::DEBUG);
+	$Apache::WeSQL::cookies{id} = -1 if (!defined($Apache::WeSQL::cookies{id}));
+	$Apache::WeSQL::cookies{hash} = -1 if (!defined($Apache::WeSQL::cookies{hash}));
+	$redirstr = 'jloginform.wsql?redirdest=';
 	if (($ENV{REQUEST_URI} =~ /^$superuserdir/) && ($authsuper == 1)) {
-		$redirstr = $superuserdir . 'jloginform.wsql?redirdest=';
-		$Apache::WeSQL::cookies{id} = -1 if (!defined($Apache::WeSQL::cookies{id}));
-		$Apache::WeSQL::cookies{hash} = -1 if (!defined($Apache::WeSQL::cookies{hash}));
+		$redirstr = $superuserdir . $redirstr;
 		$sql = "select hash from logins,users where logins.userid=users.id and userid='$Apache::WeSQL::cookies{su}' " . 
 						"and hash='$Apache::WeSQL::cookies{hash}' and logins.status='1' and users.status='1' and users.superuser='1'";
+		&Apache::WeSQL::log_error("$$: Auth.pm: authenticate: sudir requested, authsuper=1, redirstr: $redirstr") if ($Apache::WeSQL::DEBUG);
 	} else {
-		$Apache::WeSQL::cookies{id} = -1 if (!defined($Apache::WeSQL::cookies{id}));
-		$Apache::WeSQL::cookies{hash} = -1 if (!defined($Apache::WeSQL::cookies{hash}));
-		$redirstr = 'jloginform.wsql?redirdest=';
 		$sql = "select hash from logins where userid='$Apache::WeSQL::cookies{id}' and hash='$Apache::WeSQL::cookies{hash}' and status='1'";
+		&Apache::WeSQL::log_error("$$: Auth.pm: authenticate: no sudir requested and/or authsuper=1, redirstr: $redirstr") if ($Apache::WeSQL::DEBUG);
 	}
 	if (($ENV{REQUEST_URI} =~ /^$superuserdir/) && ($authsuper != 1)) {	# $authsuperuser is disabled in WeSQL.pl, so no logging in as a superuser!
 		my $request_uri = $ENV{REQUEST_URI};
 		$request_uri ||= "";
 		my $escaped = CGI::escape($request_uri);
+		&Apache::WeSQL::log_error("$$: Auth.pm: authenticate: XXX redir to: $redirstr$escaped REQUEST_URI: $request_uri") if ($Apache::WeSQL::DEBUG);
 		&Apache::WeSQL::redirect($redirstr . $escaped);
 	}
 	# Check if this request comes from a user that is logged in!
@@ -66,7 +67,12 @@ sub authenticate {
 		my $request_uri = $ENV{REQUEST_URI};
 		$request_uri ||= "";
 		my $escaped = CGI::escape($request_uri);
-		&Apache::WeSQL::redirect($redirstr . $escaped);
+		&Apache::WeSQL::log_error("$$: Auth.pm: authenticate: redir to: $redirstr$escaped REQUEST_URI: $request_uri") if ($Apache::WeSQL::DEBUG);
+		if ($request_uri =~ /jloginform\.wsql\?redirdest=.*$/) {	# Circular redirect!!
+			&Apache::WeSQL::Journalled::jErrorMessage("Error on the server (perpetual redirect). Please contact the webmaster!","$$: Auth.pm: authenticate: Perpetual redirect, redirecting $request_uri to jloginform.wsql",1);
+		} else {
+			&Apache::WeSQL::redirect($redirstr . $escaped);
+		}
 	}
 }
 
@@ -169,7 +175,7 @@ sub jLoginForm {
 	my %layout = &Apache::WeSQL::readLayoutFile('layout.cf');
 	# Protect against 'Use of uninitialized value in concatenation...' errors in the log files!
 	$layout{listheader} ||= ''; $layout{listbody} ||= ''; $layout{liststarttable1} ||= ''; $layout{liststarttable2} ||= '';
-	$layout{publiclogon} ||= ''; $layout{liststoptable} ||= ''; $layout{listfooter} ||= '';
+	$layout{publiclogon} ||= ''; $layout{liststoptable} ||= ''; $layout{listfooter} ||= ''; $layout{loginformcaption} ||= '';
 	$body = <<EOF;
 HTTP/1.1 200 OK
 Date: $dd
@@ -184,7 +190,7 @@ $layout{listheader}
 <title>Log In</title>
 $layout{listbody}
 $layout{liststarttable1}
-<center><b>Log In</b></center>
+<center><b>$layout{loginformcaption}</b></center>
 $layout{liststarttable2}
 $layout{loginform1}
 <input type=hidden name=redirdest value="$Apache::WeSQL::params{redirdest}">
@@ -216,7 +222,7 @@ of authentication support, that is, because you could easily implement your own.
 
 This module is called from AppHandler.pm, and WeSQL.pm
 
-This module is part of the WeSQL package, version 0.51
+This module is part of the WeSQL package, version 0.52
 
 (c) 2000-2002 by Ward Vandewege
 

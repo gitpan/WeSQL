@@ -40,7 +40,7 @@ our @EXPORT = qw(
 
 );
 
-$VERSION = '0.51';
+$VERSION = '0.52';
 
 our $DEBUGTYPE = 'apache';
 
@@ -82,6 +82,14 @@ sub display {
 	# themselves.
 	my ($result,$errorcode) = ("",0);
 	my $uri = $r->uri;
+
+	# Note that the next line will make requests ending in a slash look for a index.wsql file...
+	# So if you want to link to a index.html file, you'll have to put the file name in the request!
+	$uri .= "index.wsql" if ($uri =~ /\/$/);
+
+	# Multi-language support
+	$uri =~ s/\.[\w\-]{2,5}\.wsql$/\.wsql/;
+
 	for ($uri) {
 		/\/jadd.wsql$/				&& do { ($result,$errorcode) = &jAddPrepare($dbh,$cookieheader); last; };
 		/\/jupdate.wsql$/			&& do { ($result,$errorcode) = &jUpdatePrepare($dbh,$cookieheader); last; };
@@ -97,22 +105,20 @@ sub display {
 
 	if ($result eq "") {
 		my $dd = localtime();
-		# Print a proper HTTP header
-		print <<EOF;
+		unless ($uri =~ /redirect\.wsql$/) {
+			# Print a proper HTTP header
+			print <<EOF;
 HTTP/1.1 200 OK
 Date: $dd
 Server: Apache
 EOF
-		print "$cookieheader\r\n" if (defined($cookieheader) && ($cookieheader ne ''));
-		print <<EOF;
+			print "$cookieheader\r\n" if (defined($cookieheader) && ($cookieheader ne ''));
+			print <<EOF;
 Connection: close
 Content-type: text/html
 
 EOF
-		# Note that the next line will make requests ending in a slash look for a index.wsql file...
-		# So if you want to link to a index.html file, you'll have to put the file name in the request!
-		$uri .= "index.wsql" if ($uri =~ /\/$/);
-
+		}
 		my $doc_root = $r->document_root;
 
 		$result = &readWeSQLFile($doc_root . $uri);
@@ -169,6 +175,7 @@ sub dolayout {
   my $errorcode = 0;
 	my (@commandlist) = @_;
   foreach (@commandlist) {
+		&log_error("$$: WeSQL.pm: dolayout: executing $_") if ($DEBUG > 1);
 		$body = eval($_);
 		# The following will log errors from the eval() 
 		&log_error("$$: WeSQL.pm: dolayout: eval error: " . $@) if $@;  
@@ -271,6 +278,9 @@ sub printlist_inline {
 ############################################################
 sub readLayoutFile {
 	my $file = shift;
+	my $nestlevel = shift;
+
+	$nestlevel ||= 0;
 
 	my %aliases;
 	my $r = Apache->request;
@@ -289,6 +299,15 @@ sub readLayoutFile {
 	my $layoutinfo = join("",<LAYOUT>);
 	close(LAYOUT);
 
+	if ($layoutinfo =~ /^inherit:(.*?)\n/) {
+		if ($nestlevel < 10) {		# Protect people from eternal loops...
+			&log_error("$$: WeSQL.pm: readLayoutFile: detected inheritance level " . ++$nestlevel . ", reading $1!");
+			%aliases = &readLayoutFile($1,$nestlevel);
+		} else {
+			&log_error("$$: WeSQL.pm: readLayoutFile: detected 10 levels of inheritance, aborting inheritance here!");
+		}
+	}
+
 	my @aliases = split(/\n\n/,$layoutinfo);
 	foreach (@aliases) { 
 		my @lines = split(/\n/,$_);
@@ -296,7 +315,6 @@ sub readLayoutFile {
 		while (($name eq "") && ($#lines > -1)) {
 			$name = shift @lines; #First line should contain nothing but the name of the layoutalias
 		}
-		return %aliases if ($#lines < 0); #Bail out if end of file reached
 		$aliases{$name} = join("\n",@lines);
 	} 
 	&log_error("$$: WeSQL.pm: readLayoutFile: file '$file' succesfully read") if ($DEBUG);
@@ -309,13 +327,47 @@ sub readLayoutFile {
 
 sub dolayouttags {
   my $body = shift;
-	my %layout = &readLayoutFile("layout.cf");
+	my %layout = ();
+
+	if ($cookies{WeSQL_language} ne '') {
+		%layout = &readLayoutFile("layout.$cookies{WeSQL_language}.cf");
+	} else {
+		%layout = &readLayoutFile("layout.cf");
+	}
+
   $body =~ s/<!--\s*LAYOUT\s+(.*?)\s+-->/&log_error("$$: WeSQL.pm: dolayouttags: no layout key '$1' found") if (!defined($layout{$1}));$layout{$1}||="";$layout{$1}/sieg;
   return $body;
 }
 
 ############################################################
 # end of <!-- LAYOUT TAG --> tag code
+############################################################
+
+############################################################
+# dolanguages deals with the <LANG>text</LANG> tag
+############################################################
+sub dolanguages {
+	my $body = shift;
+
+	my $uri = $r->uri;
+  my ($baseuri) = ($uri =~ /^(.+)\//);
+  my $doc_root = $r->document_root;
+	$baseuri .= '/';
+
+	opendir(DIR, $doc_root . $baseuri) || die "can't opendir $doc_root . $baseuri: $!";
+	my @layoutfiles = grep { /^layout\..*?\.cf$/ && -f $doc_root . "$baseuri/$_" } readdir(DIR);
+	closedir DIR;
+
+	# Now deal with the language tags, that could look like <en>stuff</en> or <en 454>stuff</en>
+	foreach (@layoutfiles) {
+		my ($lang) = (/^layout\.(.*?)\.cf$/);
+  	$body =~ s/<$lang( *\d*|)>(.*?)<\/$lang>/($lang eq $cookies{WeSQL_language})?$2:''/sieg;
+	}
+
+	return $body;
+}
+############################################################
+# end of <LANG>text</LANG> tag code
 ############################################################
 
 ############################################################
@@ -411,16 +463,16 @@ sub dosubst_inline {
 # $@ gets lost in the s//eval()/ statement in doeval.
 sub evalinline {
 	my $eval = eval($_[0]);
-	&log_error("$$: DOEVAL EVAL ERROR: " . $@) if $@;  #This will log errors from the eval() 
+	&log_error("$$: DOEVAL EVAL ERROR: " . $@) if ($@ || !defined($eval));  #This will log errors from the eval() 
 	return $eval;
 }
 
 sub doeval {
 	my $body = shift;
 	my $param = shift;
-	# And then the single-line style evals (e.g. <!-- EVAL POST (some_perl_code) -->)
+	# First do the single-line style evals (e.g. <!-- EVAL POST (some_perl_code) -->)
 	$body =~ s/<!-- EVAL $param (.+?) -->/&evalinline($1)/emg;
-	# First do the multi-line evals
+	# And then the multi-line evals
 	$body =~ s/<!-- EVAL $param\s*\n(.*?)^\/EVAL $param -->/&evalinline($1)/esmg;
 	return $body;
 }
@@ -529,13 +581,17 @@ sub getparams {
 	# (used for the INSERT statement)
 	# For this we need a 'prefix' parameter
 	my $dbh = shift;
-  my $prefix = shift; 
+  my $prefix = shift;
+	my $cookieheader = shift;
+	my $defaultlanguage = shift;
   undef $r if $r; 
   undef %params if %params;
   undef %cookies if %cookies;
   $r = Apache->request;
   require CGI;
   my $q = new CGI;
+
+	&log_error("$$: WeSQL.pm: getparams: entering!") if ($DEBUG);
 
 	# Set our %cookies hash
   foreach ($q->cookie) {
@@ -548,6 +604,16 @@ sub getparams {
 		&log_error("$$: WeSQL.pm: getparams: cookie: $_ -> " . $q->cookie($_)) if ($DEBUG);
   }
 
+	# $cookieheader is used to pass values of cookies that have been set while processing this page, and hence
+	# are not passed by the browser yet! Used from AppHandler.pm, to pass the session hash when that is first 
+	# set.
+	if (defined($cookieheader) && ($cookieheader ne '')) {
+		if ($cookieheader =~ /Set-Cookie: (.*?)=(.*)/) {
+			$cookies{$1} = $2;
+			&log_error("$$: WeSQL.pm: getparams: cookie: $1 -> $2") if ($DEBUG);
+		}
+	}
+
 	undef($cookies{su}) if (defined($cookies{su}));   #Nonono, this cookie should NEVER be on your hard-drive :-)
 	if (defined($cookies{id}) && defined($cookies{hash})) {		#This is - probably - a logged in user
 		# my @sucheck = sqlSelect("superuser","users","uid='$WeSQL::cookies{id}' and status='1'");
@@ -559,30 +625,111 @@ sub getparams {
 			&log_error("$$: WeSQL.pm: getparams: updated cookie: su -> $cookies{su}") if ($DEBUG);
 		}
 	}
-	#Avoid trouble with single quotes (') in the fields. $q->param should not
-	#be used beyond this sub, instead use the %params hash that escapes single
-	#quotes (see below)
-	#And escape double quotes, too
+	# $q->param should not be used beyond this sub, instead use the %params hash that does away
+	# with all sorts of dangerous input!
 	foreach ($q->param) {
 		my $tmp = $_;
-		if (defined($prefix)) {
+		if (defined($prefix) && ($prefix ne '')) {
 			next if (!($_ =~ /^$prefix/));
 			$tmp =~ s/^$prefix//g;
 		}
+		# If multiple parameters have the same name, append them together, separated by a pipe symbol
 		$params{$tmp} = join("|",$q->param($_));
-		$params{$tmp} =~ s/\'/\\\'/sg;
-		$params{$tmp} =~ s/\"/\\\"/sg;
 		# The NULL character terminates strings in C. Hence all sorts of nasty things can happen when a NULL is passed to a C program like MySQL...
 		# The ; character terminates sql statements. Let's nuke that one too.
 		$params{$tmp} =~ s/#0|%0|%3B//sg;
 
 		#	The following lines are CRUCIAL FOR SECURITY - REMOVE AT YOUR OWN RISK!
-		#	Anyone trying to insert a WeSQL-style comment (e.g. <!-- EVAL POST), will be
-		#	stopped by this :-) And inserting a PR_ style parameter to fool the second pass
+		#	Anyone trying to insert a WeSQL-style command (e.g. <!-- EVAL POST), will be
+		#	stopped by this :-) And inserting a PR_ style parameter, which could then contain a WeSQL-style command, to fool the second pass
 		#	won't work either :-)
 		$params{$tmp} =~ s/<!--/<!---/g;
 		$params{$tmp} =~ s/PR_/PR/g;
 	}
+
+	# Check out the language situation - we set a fake, server-side only cookie with the name of the preferred language	
+	my $uri = $r->uri;
+  my ($baseuri) = ($uri =~ /^(.+)\//);
+  my $doc_root = $r->document_root;
+	$baseuri .= '/';
+
+	my $sessionlang = &Apache::WeSQL::Session::sRead($dbh,'language');
+	# Priority: 
+	# 	Check if a specific language uri was requested, and if the corresponding language file exists. 
+	# 	If so, serve the right file, and store the language in the session.
+	# Second: 
+	#		Check if a language is stored in the session.
+	# Third: 
+	# 	Check if the browser specified a 'preferred' language
+	# Finally: 
+	#		Check if a default language has been set, if not look for layout.xx.cf files and take the one
+	#		that comes first in the alphabet. If there are none, just fall back to a single-language site.
+	if (($r->uri =~ /\.([\w\-]{2,5})\.wsql$/) && (-f $doc_root . $baseuri . "layout.$1.cf")) {
+		&log_error("$$: WeSQL.pm: getparams: a page in the language $1 was requested") if ($DEBUG);
+		&log_error("$$: WeSQL.pm: getparams: setting session language to $1") if ($DEBUG);
+		&Apache::WeSQL::Session::sOverWrite($dbh,'language',$1);
+		$cookies{'WeSQL_language'} = $1;
+	} elsif (defined($sessionlang) && (-f $doc_root . $baseuri . "layout.$sessionlang.cf")) {
+		&log_error("$$: WeSQL.pm: getparams: reading layout in session language $sessionlang") if ($DEBUG);
+		$cookies{'WeSQL_language'} = $sessionlang;
+	} elsif (defined($r->header_in('Accept-Language'))) {	
+		&log_error("$$: WeSQL.pm: getparams: Accept-Language: " . $r->header_in('Accept-Language')) if ($DEBUG);
+		# Example header: 
+		# Mozilla 0.99: Accept-Language: nl, en;q=0.66, en-us;q=0.33
+		# Opera for Linux 6.0 Beta 2: Accept-Language: nl,en
+		my @langs = split(/\,/,$r->header_in('Accept-Language'));
+		for (my $cnt=0;$cnt<=$#langs;$cnt++) { 
+			$langs[$cnt] =~ s/^\s*//; 
+			$langs[$cnt] =~ s/;.*$//; 
+		}
+		# Now select the correct language. Languages are defined for the site if a layout.cf file 
+		# exists for them. This is typically just a symlink to layout.cf, with a name like layout.nl.cf.
+		foreach (@langs) {
+			my $lang = $_;
+			if (-f $doc_root . $baseuri . "layout.$lang.cf") {
+				$cookies{'WeSQL_language'} = $lang;
+				last;
+			}
+		}
+		# Some languages look like this: fr-ch. In those cases, if no language has been selected by
+		# the mechanism above, we will try to match the 'base' language, that is the part before the
+		# hyphen, in this case 'fr'.
+		if (!defined($cookies{'WeSQL_language'})) {
+			foreach (@langs) {
+				my $lang = $_;
+				my ($shortlang) = ($lang =~ /^(.*?)-.*$/);
+				$shortlang ||= '';
+				if (($shortlang ne '')  && (-f $doc_root . $baseuri . "layout.$shortlang.cf")) {
+	        $cookies{'WeSQL_language'} = $shortlang;
+  	      last;
+    	  }
+			}
+		}
+		$cookies{'WeSQL_language'} = '' if (!defined($cookies{'WeSQL_language'}));
+	} else {
+		# First check for the default language setting
+		if (defined($defaultlanguage) && ($defaultlanguage ne '') && (-f $doc_root . $baseuri . "layout.$defaultlanguage.cf")) {
+			&log_error("$$: WeSQL.pm: getparams: setting language to defaultlanguage $defaultlanguage as set in the WeSQL.pl file") if ($DEBUG);
+			$cookies{'WeSQL_language'} = $defaultlanguage;
+	 	} else {	# Then just see if any layout.xx.cf files are available, and take the first one (alphabetically)
+			&log_error("$$: WeSQL.pm: getparams: no default language set in the WeSQL.pl file, looking for language specific layout.cf files") if ($DEBUG);
+			opendir(DIR, $doc_root . $baseuri) || die "can't opendir $doc_root" . $baseuri . ": $!";
+			my @layoutfiles = grep { /^layout\..{2,}?\.cf$/ } readdir(DIR);
+			closedir DIR;
+			foreach (sort @layoutfiles) {
+				if (/^layout\.(.{2,})\.cf$/) {
+					$cookies{'WeSQL_language'} = $1;
+					last;
+				}
+			}
+		}
+		# Finally fall back to single-language site
+ 		if (!defined($cookies{'WeSQL_language'})) {
+			$cookies{'WeSQL_language'} = '';
+			&log_error("$$: WeSQL.pm: getparams: falling back to single language site") if ($DEBUG);
+		}
+	}
+
 	return (\%params,\%cookies);
 }
 
@@ -654,7 +801,7 @@ Data-ShowTable
 ApacheDBI
 
 =item *
-Msql-Mysql-modules or DBD-Pg
+DBD-mysql or DBD-Pg
 
 =back
 
@@ -718,8 +865,13 @@ on my system: /usr/local/lib/perl5/site_perl/5.6.1/Apache/WeSQL/AppHandler.pm
 =item *
 
 Now edit AppHandler2.pm and replace all occurences of the string 'AppHandler'
-with 'AppHandler2'. There should be 4 occurences in v0.5x. If you use vi/vim, you can
-use this command: :%s/AppHandler/AppHandler2/g
+with 'AppHandler2'. If you use vi/vim, you can use this command: 
+:%s/AppHandler/AppHandler2/g
+
+=item $
+
+Then update the occurrences of 'WeSQLConfig' to something else, for instance 
+'WeSQLConfig2'.
 
 =item *
 
@@ -746,7 +898,7 @@ you had your first site defined like this:
   </VirtualHost>
 
 Now you define the new site as a second virtual host, changing all appropriate data. In particular, change
-all occurences of 'AppHandler' to 'AppHandler2'.
+all occurences of 'AppHandler' to 'AppHandler2', and change 'WeSQLConfig' to 'WeSQLConfig2'.
 
 =item *
 
@@ -766,6 +918,32 @@ html in your WeSQL files. But if you want to run several applications on the sam
 want a separate database connection for each application. That is why the AppHandler module needs to be
 duplicated and renamed, as the persistent database connection lives in that module. 
 I have thought long and hard about this but have not found a better solution. If you have one, let me know!!
+
+=head1 NAMING CONVETIONS FOR .WSQL FILES
+
+All files you want to be parsed by WeSQL should have the .wsql extension. Files with other extensions will be dealt with
+in the normal way by Apache.
+
+There are a number of 'virtual' files that you can call, but don't exist on your hard-drive, the calls are
+intercepted by WeSQL. These are found in the display sub in WeSQL.pm, they are:
+
+	jadd.wsql
+	jupdate.wsql
+	jdelete.wsql
+	jform.wsql
+	jdeleteform.wsql
+	jdetails.wsql
+	jlist.wsql
+	jloginform.wsql
+	jlogin.wsql
+	jlogout.wsql
+
+These files are used by the journalling code and can be controlled by the form.cf, details.cf, list.cf and permissions.cf files, 
+as explained in the Apache::WeSQL::Display man page.
+
+If you don't want WeSQL to print HTTP headers before sending the result of your parsed wesql file to the browser, for instance
+because you want to generate it yourself, or because you want to redirect to another url, just make
+sure the name of the file ends in redirect.wsql, e.g. like this: file1redirect.wsql (this feature was introduced in WeSQL v0.52).
 
 =head1 WESQL.PL CONFIGURATION FILE
 
@@ -794,6 +972,8 @@ You can decide which parsing steps you want WeSQL to use, by changing the @comma
 =for html <pre>
 
 @commandlist = (
+      'dolayouttags($body)',
+      'dolanguages($body)',
       'dosubst($body,"PR_",%params)',
       'dosubst($body,"ENV_",%ENV)',
       'dosubst($body,"COOKIE_",%cookies)',
@@ -805,8 +985,8 @@ You can decide which parsing steps you want WeSQL to use, by changing the @comma
       'doeval($body,"PRELIST")',
       'dolist($body,$dbh)',
       'doeval($body,"POST")',
-      'dolayouttags($body)',
       'docutcheck($body)'
+
       );
 
 =for html </pre>
@@ -815,37 +995,91 @@ These default steps process the WeSQL file in the following order:
 
 =over 4
 
-=item  1.
-Substitute PR_, ENV_, and COOKIE_ style parameters by their respective values
-
-=item  2.
-Execute any EVALs with the PRE tag
-
-=item  3.
-Insert another WeSQL file (note that the inserted file will have PR_, ENV_, and COOKIE_ style parameters replaced by their respective values!)
-
-=item 4.
-Execute any EVALs with the POSTINSERT tag
-
-=item 5.
-Process the PARAMCHECK tags
-
-=item 6.
-Process the CUTFILE tags
-
-=item 7.
-Execute any EVALs with the PRELIST tag
-
-=item 8.
-Process the LIST tags
-
-=item 9.
-Execute any EVALs with the POST tag
-
-=item 10.
+=item 1.
 Replace the LAYOUT tags with the corresponding layout block from layout.cf
 
+=item 2. (introduced in WeSQL v0.52)
+Deals with the LANGUAGE tags. 
+
+Since version 0.52, WeSQL supports 'content negotiation' for languages, as defined in the HTTP/1.1 standard.
+Compliant browsers (Mozilla, Opera 6.0 and higher, Netscape, ...) add an 'Accept-Language' header to the 
+requests for files. WeSQL now understands those headers, and can serve the content in the correct language to
+the browser - provided, of course, that the content is available in this language.
+
+Examples of language strings are 'en', 'nl', 'fr', 'de', etc.
+
+In order to create content in other languages than the default language, for instance Dutch, you need to create 
+a 'layout.nl.cf' file. If there is no need for a specific language version of your layout.cf file, just create a
+symlink to layout.cf.
+
+In your .wsql files, you can now put text between <nl> and </nl> tags, which will make this text be sent to the
+browser _only_ if the browser asks for a version of the language in Dutch. This is done with the call to the 
+'dolanguages' sub in WeSQL.pm. If you forget to create a layout.nl.cf file, you will see the content between the
+<nl> and </nl> tags for requests in all languages.
+
+If you are upgrading from an earlier WeSQL installation, you will need to add a line to the @commandlist in 
+conf/WeSQL.pl. Preferably just after the dolayouttags call, like this:
+
+  @commandlist = (
+      'dolayouttags($body)',
+      'dolanguages($body)',			<<<<<< Add this line
+      'dosubst($body,"PR_",%params)',
+
+
+Here is the WeSQL decision path for which language to serve the requested document in:
+
+1. Is there a language requested in the URI?
+
+In order to get a specific language version of a file, for instance English, you can requests
+'index.en.wsql'. This file does not exist on disk, but WeSQL will determine from this request that
+you really want the index.wsql file in English, and honour that request, provided the layout.en.cf
+file exists. If not, the layout.cf file will be used.
+
+The side effect of this request, is that the default session language (see below) will be set to English.
+This has the effect of switching languages in the site, without having to worry about subsequent URLs.
+
+Else: 2. Is there a language stored in the session?
+
+If there is a session variable with name 'language' and a value different from '', WeSQL will serve the
+document in the language specified in the session variable.
+
+This session variable is set after a call to a page requesting a specific language in the URI, as described under 1.
+
+Else: 3. Is there a content negotiation 'Accept-Language' header?
+
+If the browser sends an Accept-Language header, it will be respected, provided the corresponding layout.xx.cf file
+exists.
+
+Else: 4. Fallback to layout.cf
+
+=item 3.
+Substitute PR_, ENV_, and COOKIE_ style parameters by their respective values
+
+=item 4.
+Execute any EVALs with the PRE tag
+
+=item 5.
+Insert another WeSQL file (note that the inserted file will have PR_, ENV_, and COOKIE_ style parameters replaced by their respective values!)
+
+=item 6.
+Execute any EVALs with the POSTINSERT tag
+
+=item 7.
+Process the PARAMCHECK tags
+
+=item 8.
+Process the CUTFILE tags
+
+=item 9.
+Execute any EVALs with the PRELIST tag
+
+=item 10.
+Process the LIST tags
+
 =item 11.
+Execute any EVALs with the POST tag
+
+=item 12.
 Process the CUTFILE tags once more (there might be new ones from the EVAL blocks or the LAYOUT step!)
 
 =back
@@ -1227,7 +1461,7 @@ Yes. But, of course, the latter is lots faster, especially on large tables... So
 
 And this would have the desired results, depending on whether name is defined as a parameter or not.
 
-This module is part of the WeSQL package, version 0.51
+This module is part of the WeSQL package, version 0.52
 
 (c) 2000-2002 by Ward Vandewege
 

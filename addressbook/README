@@ -1,4 +1,4 @@
-Sample Addressbook Application for Apache::WeSQL version 0.51
+Sample Addressbook Application for Apache::WeSQL version 0.52
 =============================================================
 
 This directory contains the 'sample' application, basically an Addressbook application for WeSQL.
@@ -11,7 +11,7 @@ Also, you haven't forgotten about these perl modules that need to be installed, 
        o DBI
        o Data-ShowTable
        o ApacheDBI
-       o Msql-Mysql-modules or DBD-Pg
+       o DBD-Mysql or DBD-Pg	(don't use the Msql-Mysql module, it has bugs!)
 
 Now let's create the database for the addressbook application. In the database directory you will find 6 files:
 
@@ -80,9 +80,9 @@ The whole site lives in the 'public_html' directory. Have a look through it, and
 
 All the other documentation is in the man pages: Apache::WeSQL, Apache::WeSQL::Display, Apache::WeSQL::Journalled, Apache::WeSQL::SqlFunc, Apache::WeSQL::Auth, and Apache::WeSQL::AppHandler.
 
-Do drop me a line at ward@pong.be about how you use WeSQL, and enjoy!
+Do drop me a line at w@wesql.org about how you use WeSQL, and enjoy!
 Ward Vandewege,
-2002.02.14
+2002.05.19
 
 COPYRIGHT AND LICENCE
 

@@ -7,6 +7,56 @@
 <table width=800>
 <tr>
 <td>
+<b>v0.52 (2002.05.19):</b><p>
+<i>New features</i><br>
+<ul>
+<li>Added multi-language support. WeSQL now supports content negotiation for languages, as defined in the HTTP/1.1 standard.  Compliant browsers (Mozilla, Opera 6.0 and higher, Netscape, ...) add an 'Accept-Language' header to the requests for files. WeSQL now understands those headers, and can serve the content in the correct language to the browser - provided, of course, that the content is available in this language. See man Apache::WeSQL for more information.
+<li>Added full form:select() style parsing to layout.cf and style.cf, just like in form.cf. This replaces the more limited replace:select() syntax in these files.
+<li>Added support for an append: line in form.cf, details.cf and list.cf, which allows adding something to the page in all cases
+<li>Added alignkey and alignval for details.cf and form.cf, allowing aligning the key and value column as a whole. The align parameter still works and will affect the alignment of one database key/value.
+<li>.cf files may now have the value of a key (except captions and align) spread out over multiple lines, as long as the extra lines begin with whitespace (and of course they can not be all whitespace, or they would be seen as a view separator!).
+<li>Added the buildquery key in details.cf, form.cf, and list.cf, which takes a perl expression as its value, that should evaluate to a proper sql query. When specifying this key, the query key (if defined) will be overwritten by the output of the eval of the buildquery key
+<li>Moved all remaining hardcoded html in Display.pm (subs jList, jForm and jDetails) to layout blocks defined in the layout.cf file.
+<li>The layout tags used by jlist.wsql, jform.wsql and jdetails.wsql can now be overridden in the list.cf file as follows:
+<p>
+layout&lt;tagname&gt;:&lt;newtagname&gt;
+<p> 
+For example:
+<p>
+layoutformrowstart:myformrowstart
+<p>
+In your layout.cf file, you have to define a 'myformrowstart' layout block.
+<li>Added a check in WeSQL::Auth, sub authenticate, for 'perpetual redirects' which can happen if there are errors in the conf/WeSQL.pl file. Now you'll get a nice error message on the screen and in the logs.
+<li>Added a little intelligence to filenames. Any wsql file that ends in 'redirect.wsql', like 'file1redirect.wsql', will not have headers printed before it is parsed, which allows you to redirect to another url from this file using the &Apache::WeSQL::redirect function.
+<li>Changed the default type of the value column in table sessiondata from 'varchar(255)' to 'text'
+<li>Allow setting of default values through passing parameters for a form with id='new'
+<li>Comments may now be used in .cf files: just start the line with a # sign (it may be preceded by whitespace)
+<li>Added preprocess: tag in permissions.cf. With this command, you can execute blocks of perl code _before_ data is added to the database by jAdd or jUpdate. See the man page for Display.pm for the exact syntax and more information.
+<li>In the 'show' element of the form:select tag you can now use [some text #hname some other text|alternate value] style syntax. See the manpage for Apache::WeSQL::Display.
+<li>jlist.wsql now remembers the last 'from' value (i.e. the position in the list) per view and per session, allowing jumping back to the correct position in the list without passing it as a parameter
+<li>Removed the tablefooter attribute from list.cf, details.cf and form.cf, as it was identical with the append attribute.
+<li>The layout.cf file can now inherit all layout entries from another layout.cf file. See the Apache::Display manpage for more information.
+<li>Upgrade from Msql-Mysql perl module to DBD-mysql. Msql-Mysql is buggy!
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>Removed inconsistency where $Apache::WeSQL::params{something} in the details.cf file (only!) would be translated to $params{something}. Use $params{something} there from now on, like in the other .cf files.
+<li>Removed 'order by' parts of query when doing a count of the returned records in jlist.wsql (this gave errors like 'Attribute table.column must be GROUPed or used in an aggregate function' with PostgreSQL)
+<li>Fixed an obscure bug that, in certain cases, would cause the %data and %cookies hash in the last view of a .cf file not being properly translated to their values
+<li>Improved the regexp matching for the select() blocks in form: elements of .cf files. Using () in the sql select query will now not cause WeSQL to go haywire.
+<li>Bugfix: when using the hide: command in list.cf, you had to specify the caption of the column instead of the column name for the hide function to work properly. Now it's the column name like everywhere else.
+<li>Bugfix: the parsing of the blocks in layout.cf would be aborted when a key without following lines would be found.
+<li>Bugfix: 'captions' and 'align' lines in .cf files would be improperly parsed if more than one '=' sign appeared in the blocks between the '|' symbols
+<li>Bugfix: there was a call to an unexistant function when using an sql query in the right-hand side of an sqlcondition line in permissions.cf
+<li>Bugfix: the [something$cookies{value}somethingelse|alternative] syntax in .cf files now works properly (just like it does for %params)
+<li>Bugfix: no more problems with single and double quotes 'multiplying'
+<li>When running multiple WeSQL sites on one host, it is also necessary to change the name of the WeSQLConfig Perl variable for every WeSQL application. I've updated the documentation in the Apache::WeSQL man page accordingly.
+</ul>
+For the upgrade path from v0.51, consult the <a href=upgrade.html>Upgrade</a> page.<p>&nbsp;
+</td>
+</tr>
+<tr>
+<td>
 <b>v0.51 (2002.02.14): Valentine release</b><p>
 <ul>
 <li>Added 'hideifdefault' for jdetails.wsql, allowing to hide records if they match a default value

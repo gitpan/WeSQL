@@ -36,7 +36,7 @@ create table sessiondata (
 
 	sessionid bigint(20) unsigned not null,
 	name varchar(50) default '' not null,
-	value varchar(255) default '' not null,
+	value text default '' not null,
 	primary key (pkey)
 );
 

@@ -25,7 +25,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 ############################################################
 # jAdd
@@ -275,22 +275,34 @@ sub readConfigFile {
 		while (($name eq "") && ($#lines > -1)) {
 			$name = shift @lines; #First line should contain nothing but the name of the view
 		}
-		return %data if ($#lines < 0);	#Bail out if end of file reached
+		last if ($#lines < 0);	#Bail out if end of file reached
 		if ($view ne $name) { next; }
 		my %count;
+		my $oldtype = '';
 		foreach (@lines) {
-			my ($type, $body) = split(/:/,$_,2);
+			my $line = $_;
+			my ($type, $body);
+			next if ($line =~ /^\s*#/);	# Skip lines that start with a # (comment) comment sign
+			if (!($line =~ /^\s+/)) {	# New line, new key
+				($type, $body) = split(/:/,$line,2);
+				$oldtype = lc($type);
+			} else {	# Line starts with whitespace, it must belong to the previously defined key!
+				$data{$oldtype} .= "\n$line";
+				next;
+			}
 			if (lc($type) eq "inherit") { #inherit will overwrite any earlier definitions!!
 				%data = &readConfigFile($file,$body);
 			} elsif (lc($type) =~ /^(captions|align)$/) {	# For jList, jDetails and jForm
 				my @pairs = split(/\|/,$body);
 				foreach (@pairs) {
-					my ($column,$title) = split("=",$_);
+					my ($column,$title) = split("=",$_,2);
 		  		$data{lc($type) . ".$column"} = $title;
 				}
-			} elsif (lc($type) =~ /^(replace|form|hideifdefault)$/) {	# 'replace' for jList and jDetails, 'form' for jForm, 'hideifdefault' for jDetails
+			} elsif (lc($type) =~ /^(replace|form|hideifdefault|preprocess)$/) {	
+				# 'replace' for jList and jDetails, 'form' for jForm, 'hideifdefault' for jDetails, preprocess for jValidate only
 				my ($param1, $param2) = split(/=/,$body,2);
 				$data{lc($type) . ".$param1"} = $param2;
+				$oldtype = lc($type) . '.' . $param1;
 			} elsif (lc($type) =~ /^(sqlcondition|sqlconditiontext|validate|validateif|validateifcondition|validatetext|validateiftext)/) {	# For jValidate/jForm only
 				if (!defined($count{lc($type)})) { 
 					$count{lc($type)} = 1; 
@@ -319,8 +331,8 @@ sub readConfigFile {
 		$data{$key} =~ s/decode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugDecode(CGI::unescape($Apache::WeSQL::params{$1})):'')/eg;
 
 		$data{$key} =~ s/\$params{(.*?)}/(defined($Apache::WeSQL::params{$1})?$Apache::WeSQL::params{$1}:'')/eg;
-		$data{$key} =~ s/\$cookies{(.*?)}/(defined($Apache::WeSQL::cookies{$1})?$Apache::WeSQL::cookies{$1}:'')/eg;
 		$data{$key} =~ s/\[(.*?)\$cookies{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::cookies{$2}) && ($Apache::WeSQL::cookies{$2} ne '')?"$1$Apache::WeSQL::cookies{$2}$3":$4)/eg;
+		$data{$key} =~ s/\$cookies{(.*?)}/(defined($Apache::WeSQL::cookies{$1})?$Apache::WeSQL::cookies{$1}:'')/eg;
 		$data{$key} =~ s/dest=caller/"dest=" . operaBugEncode(CGI::escape($r->uri . "?" . $r->args))/eg;
 	}
 	# If we didn't find any data for this view, abort and flag this in the logs!
@@ -412,6 +424,7 @@ sub jValidate {
 	my ($dbh,$type,%data) = @_;
 	my $retval = "";
 	my ($colarrayref,$colhashref) = &buildColumnList($dbh,$data{table});
+	&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: doing $type validation") if ($Apache::WeSQL::DEBUG);
 	# First the 'validate' rules!
 	for (my $cnt = 1; $cnt < 101; $cnt++) {
 		last if (!defined($data{"validate.$cnt"}));
@@ -425,6 +438,7 @@ sub jValidate {
 	for (my $cnt = 1; $cnt < 101; $cnt++) {
 		last if (!defined($data{"validateif.$cnt"}));
 		# Check if the validateif condition has been met!
+		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: considering " . $data{"validateif.$cnt"} . " if " . $data{"validateifcondition.$cnt"}) if ($Apache::WeSQL::DEBUG);  
 		if (eval($data{"validateifcondition.$cnt"})) {
 			if (!(eval($data{"validateif.$cnt"}))) {
 				$data{"validateiftext.$cnt"} ||= '<font color=#FF0000>A condition has not been met!</font><br>';
@@ -433,12 +447,13 @@ sub jValidate {
 		}
 		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: validateif EVAL error: " . $@) if $@;  
 	}
-	# And finally the 'sqlcondition' rules!
+	# The 'sqlcondition' rules!
 	for (my $cnt = 1; $cnt < 101; $cnt++) {
 		last if (!defined($data{"sqlcondition.$cnt"}));
 		$data{"sqlconditiontext.$cnt"} ||= "<center><font color=#FF0000>This action can not be allowed.</font></center><br>";
 
 		my ($action,$left,$operator,$right) = split(/\|/,$data{"sqlcondition.$cnt"},4);
+		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: considering $left $operator $right if $action == $type") if ($Apache::WeSQL::DEBUG);  
 		next if (!(lc($action) =~ /$type/));	# This sqlCondition doesn't apply to the type of action
 
 		my (@r1,@r2) = ((),());
@@ -451,7 +466,7 @@ sub jValidate {
 			$r1[0] = $left;				# Proper quoting is the users responsibility here...
 		}
 		if ($right =~ /select/) {
-			my $r2 = &genericQuery($dbh,$right);
+			my $r2 = &sqlGeneric($dbh,$right);
 			@r2 = $r2->fetchrow();
 			$r2[0] = "'$r2[0]'";	#Make sure the output from the query is properly quoted as it will be eval'ed below!
 			$r2->finish();
@@ -464,6 +479,21 @@ sub jValidate {
 		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: eval error: condition: $condition gives error: " . $@) if $@;
 		$retval .= $data{"sqlconditiontext.$cnt"} if (!$returnvalue);
 	}
+
+	# And finally the 'preprocess' perl blocks!
+	# First get column names
+	my $c = &Apache::WeSQL::SqlFunc::sqlSelectMany($dbh,"select * from $data{table} limit 1");
+  my $colnameref = $c->{NAME_lc};
+	foreach (@{$colnameref}) {
+		my $colname = $_;
+		if (defined($data{"preprocess.$colname"})) {
+			my ($ctype) = ($data{"preprocess.$colname"} =~ /^(.*?)\|perl;/);
+			next if (!($ctype =~ /$type/));
+			$data{"preprocess.$colname"} =~ s/^.*?\|perl;//;
+			$Apache::WeSQL::params{$colname} = eval($data{"preprocess.$colname"});
+			&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: eval error: " . $@) if $@;  
+		}
+	}	
 	&jErrorMessage($retval . "<p>Please use the <b>back</b> button of your browser and try again", "jValidate: view $Apache::WeSQL::params{view}: ". htmlStrip($retval)) if ($retval ne '');
 }
 
@@ -547,10 +577,12 @@ sub jAddPrepare {
 
 	# See if there are any blocks of perl that we need to execute!
 	my $execute = &Apache::WeSQL::Session::sDelete($dbh,'editpostexecute');
-	# First fill in the id of the just added record if necessary
-	$execute =~ s/\#addid/$id/g;
-	eval($execute);
-	&Apache::WeSQL::log_error("$$: jAdd EVAL ERROR: " . $@) if $@;  #This will log errors from the eval() 
+	if (defined($execute)) {
+		# First fill in the id of the just added record if necessary
+		$execute =~ s/\#addid/$id/g;
+		eval($execute);
+		&Apache::WeSQL::log_error("$$: jAdd EVAL ERROR: " . $@) if $@;  #This will log errors from the eval() 
+	}
 	# Finally redirect to wherever we need to go
 	&Apache::WeSQL::redirect($redirdest,$cookieheader);
 }
@@ -728,10 +760,10 @@ Of course, for all this business with users and logging in to work, you will nee
 By calling /jAdd.wsql urls you can have records added to your database - provided they match certain rules set up in permissions.cf of course.
 See the man page for Apache::WeSQL::Display.pm for more information about that.
 
-There is one extra feature: by setting a session parameter with name 'editpostexecute' you can have a specific block of perl be executed after 
-the execution of the jAdd sub. You can use the string '#addid' if you need to refer to the id of the just added record.
+There is one extra feature: by setting a session parameter with name 'editpostexecute', containing valid perl code, you can have a specific block 
+of perl be executed after the execution of the jAdd sub. You can use the string '#addid' if you need to refer to the id of the just added record.
 
-This module is part of the WeSQL package, version 0.51
+This module is part of the WeSQL package, version 0.52
 
 (c) 2000-2002 by Ward Vandewege
 

@@ -26,7 +26,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 # Preloaded methods go here.
 
@@ -107,9 +107,11 @@ sub sqlExecuteInsert {
 	# We need to reassure that all @values items that contain non-digit characters are actually stored as strings.
 	# This is necessary for values like word.word which seem to be wrongly interpreted by the MySQL code as
 	# dbname.tablename without the following three lines. Why? Beats me. WVW, 2002-02-08
-	for (my $cnt = 0; $cnt < $#values; $cnt++) {
-		$values[$cnt] = "$values[$cnt]" if ($values[$cnt] =~ /\D/)
-	}
+	# Not necessary anymore after an upgrade from MySQL 3.23.37 and DBI 1.20 to MySQL 3.23.49 and DBI 1.21 ??? WVW, 2002-05-08
+	# Correction, bug persists. Have now removed Msql-mysql perl module and switched to DBD-mysql. Seems to have solved the issue. WVW, 2002-05-12
+#	for (my $cnt = 0; $cnt < $#values; $cnt++) {
+#		$values[$cnt] = ${$dbh}->quote($values[$cnt]) if ($values[$cnt] =~ /\D/);
+#	}
 	if(not $sth->execute(@values)) {
 		${$dbh}->rollback if ($dbtype);
 		&Apache::WeSQL::log_error("$$: sqlExecuteInsert: bad query: " . ${$dbh}->errstr);
@@ -352,7 +354,7 @@ Apache::WeSQL::SqlFunc - A library of functions to deal with the SQL database
 This module contains all functions necessary to deal with SQL databases in an easy way.
 You may call these functions directly from any WeSQL document.
 
-This module is part of the WeSQL package, version 0.51
+This module is part of the WeSQL package, version 0.52
 
 (c) 2000-2002 by Ward Vandewege
 
