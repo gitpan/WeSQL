@@ -3,7 +3,7 @@
 # Do not edit unless you know what you are doing!
 
 # This file is part of the Sample Addressbook application
-# shipped with WeSQL v0.52
+# shipped with WeSQL v0.53
 # For more information see http://wesql.org
 
 # You will need to restart the web server after changing

@@ -23,7 +23,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # Preloaded methods go here.
 ############################################################
@@ -301,7 +301,7 @@ The sessions work by storing a cookie with a unique value on the user's computer
 
 For more information, have a look at the source code of the Apache::WeSQL::Session module.
 
-This module is part of the WeSQL package, version 0.52
+This module is part of the WeSQL package, version 0.53
 
 (c) 2000-2002 by Ward Vandewege
 

@@ -7,12 +7,21 @@
 <table width=800>
 <tr>
 <td>
+<b>v0.52 -> v0.53:</b><p>
+</td>
+</tr>
+<tr>
+<td>
+You need to do nothing at all!!
+</td>
+</tr>
+<tr>
+<td>
 <b>v0.51 -> v0.52:</b><p>
 </td>
 </tr>
 <tr><td>
 <ol>
-<li>If you are using MySQL, remove the Msql-Mysql perl modules from your system, and switch to DBD-Mysql (available from CPAN). Msql-Mysql is buggy!
 <li>In MySQL, execute: alter table sessiondata change value text default '' not null;<p>
 <li>In the file(s) details.cf, replace all occurencies of $key by $data{key}. I've removed this extra bit of syntactic sugar to simplify things (and to sanitize them, as it only worked in details.cf, and not in the other .cf files).
 <li>In the file(s) details.cf, replace all occurencies of $Apache::WeSQL::params{...} by $params{...}. I've removed this extra bit of syntactic sugar to simplify things (and to sanitize them, as it only worked in details.cf, and not in the other .cf files).

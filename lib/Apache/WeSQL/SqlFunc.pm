@@ -26,7 +26,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # Preloaded methods go here.
 
@@ -67,8 +67,7 @@ sub sqlPrepareInsert {
 
 	# First build the SQL statement
 	my $sql = qq{INSERT INTO $table (};
-	foreach (@columns) { $sql .= qq{$_,}; }
-	chop($sql);
+	$sql .= join(',',@columns);
 	$sql .= qq{) VALUES (} . "?," x ($#columns+1);
 	chop($sql);
 	$sql .= q{)};
@@ -76,7 +75,9 @@ sub sqlPrepareInsert {
 	&Apache::WeSQL::log_error("$$: sqlPrepareInsert: $sql") if ($Apache::WeSQL::DEBUG);
 
 	# Then prepare it
-	my $sth=${$dbh}->prepare_cached($sql) or die "Sql has gone away\n";
+#	my $sth=${$dbh}->prepare_cached($sql) or die "Sql has gone away\n";
+# Does this help against the weird DBI bug (see sqlExecuteInsert)? WVW 2002-6-4
+	my $sth=${$dbh}->prepare($sql) or die "Sql has gone away\n";
 	return ($sth);
 }
 
@@ -113,10 +114,12 @@ sub sqlExecuteInsert {
 #		$values[$cnt] = ${$dbh}->quote($values[$cnt]) if ($values[$cnt] =~ /\D/);
 #	}
 	if(not $sth->execute(@values)) {
+		$sth->finish;
 		${$dbh}->rollback if ($dbtype);
 		&Apache::WeSQL::log_error("$$: sqlExecuteInsert: bad query: " . ${$dbh}->errstr);
 		return undef;
 	}
+	$sth->finish;
 
 	if ($dbtype) { ${$dbh}->commit; }
 	return 1;
@@ -131,10 +134,9 @@ sub sqlExecuteInsert {
 ############################################################
 sub sqlInsert {
 	my $dbh = shift;
-	my ($table, $colref, $valref, $other)= @_;
+	my ($table, $colref, $valref)= @_;
 	my $sth = &sqlPrepareInsert($dbh,$table,@{$colref});
 	&sqlExecuteInsert($dbh,$sth,@{$valref});
-	$sth->finish();
 	return "";
 }
 
@@ -312,7 +314,7 @@ sub sqlConnect {
 	my ($dsn, $dbuser, $dbpass, $dbtype) = @_;
 
 	my $dbh;
-	my $autocommit = "";
+	my $autocommit = { AutoCommit => 1 };
 	if ($dbtype == 1) { #PostgreSQL supports transactions, MySQL doesn't
 		$autocommit = { AutoCommit => 0 };
 	}
@@ -354,7 +356,7 @@ Apache::WeSQL::SqlFunc - A library of functions to deal with the SQL database
 This module contains all functions necessary to deal with SQL databases in an easy way.
 You may call these functions directly from any WeSQL document.
 
-This module is part of the WeSQL package, version 0.52
+This module is part of the WeSQL package, version 0.53
 
 (c) 2000-2002 by Ward Vandewege
 

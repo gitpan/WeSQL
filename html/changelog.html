@@ -7,6 +7,23 @@
 <table width=800>
 <tr>
 <td>
+<b>v0.53 (2002.07.21):</b><p>
+<i>New features</i><br>
+<ul>
+<li>This is a bugfix release only.
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>When using complex regular expressions involving [ or ] in .cf files, they would sometimes be mangled by WeSQL. Not any more!
+<li>Language tags are now also recognised when used in the permissions.cf file
+<li>Single quotes are now escaped when they occur in %params or %cookies and when these hashes are used in validate, validateif, and sqlcondition statements in permissions.cf
+<li>The assemple.pl script in the utils directory will now also correctly recognise multi-line replacements
+<li>Up to version 0.52, MySQL + DBI + WeSQL resulted into MySQL <b>sometimes</b> choking on the sqlExecuteInsert sub in the sqlFunc module. The cause seemed to be that MySQL choked on a prepared SQL statement when filling it in with parameters that contained quotes or other weird characters. Strangely enough though, identical statements with identical parameters worked sometimes fine, and sometimes just didn't. Nevalis and I found out that the value WeSQL set the AutoCommit parameter to was 0 instead of something more decent like { AutoCommit =&gt; 1 }. I have changed that, and it seems to have solved the problem. Very, very strange. This only affected MySQL, as far as I know. 
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <b>v0.52 (2002.05.19):</b><p>
 <i>New features</i><br>
 <ul>

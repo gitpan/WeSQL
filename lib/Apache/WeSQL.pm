@@ -40,7 +40,7 @@ our @EXPORT = qw(
 
 );
 
-$VERSION = '0.52';
+$VERSION = '0.53';
 
 our $DEBUGTYPE = 'apache';
 
@@ -1461,7 +1461,7 @@ Yes. But, of course, the latter is lots faster, especially on large tables... So
 
 And this would have the desired results, depending on whether name is defined as a parameter or not.
 
-This module is part of the WeSQL package, version 0.52
+This module is part of the WeSQL package, version 0.53
 
 (c) 2000-2002 by Ward Vandewege
 

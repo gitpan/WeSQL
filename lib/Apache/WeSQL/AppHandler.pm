@@ -12,7 +12,7 @@ use Apache::WeSQL::Auth qw(:all);
 use Apache::WeSQL::Session qw(:all);
 
 use Apache::Constants qw(:common);
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # Some global variables
 
@@ -114,7 +114,7 @@ For more information about running several WeSQL sites on 1 Apache server, see t
 Apart from a sub to read the configuration file, there is no intelligence in this
 module. All calls are handled by Apache::WeSQL and its helper modules.
 
-This module is part of the WeSQL package, version 0.52
+This module is part of the WeSQL package, version 0.53
 
 (c) 2000-2002 by Ward Vandewege. This program is free software; you can redistribute it and/or modify it under the terms of the GPL.
 

@@ -22,7 +22,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # Preloaded methods go here.
 ############################################################
@@ -222,7 +222,7 @@ of authentication support, that is, because you could easily implement your own.
 
 This module is called from AppHandler.pm, and WeSQL.pm
 
-This module is part of the WeSQL package, version 0.52
+This module is part of the WeSQL package, version 0.53
 
 (c) 2000-2002 by Ward Vandewege
 

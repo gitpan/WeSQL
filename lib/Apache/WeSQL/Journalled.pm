@@ -25,7 +25,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 ############################################################
 # jAdd
@@ -298,8 +298,8 @@ sub readConfigFile {
 					my ($column,$title) = split("=",$_,2);
 		  		$data{lc($type) . ".$column"} = $title;
 				}
-			} elsif (lc($type) =~ /^(replace|form|hideifdefault|preprocess)$/) {	
-				# 'replace' for jList and jDetails, 'form' for jForm, 'hideifdefault' for jDetails, preprocess for jValidate only
+			} elsif (lc($type) =~ /^(replace|form|hideifdefault|preprocess|ifsuccessfull)$/) {	
+				# 'replace' for jList and jDetails, 'form' for jForm, 'hideifdefault' for jDetails, preprocess for jValidate only, ifsuccessfull for jAdd
 				my ($param1, $param2) = split(/=/,$body,2);
 				$data{lc($type) . ".$param1"} = $param2;
 				$oldtype = lc($type) . '.' . $param1;
@@ -315,24 +315,29 @@ sub readConfigFile {
 			}
 		}
 	}
+
+	my %params = %Apache::WeSQL::params;
+	my %cookies = %Apache::WeSQL::cookies;
+
 	foreach (keys %data) {
 		# Replace %data variables with their values!
 		# Replace %params and %cookies variables with their values!
 		# Note that we allow shorthand %cookies and %params in the '.cf' file
 		# The encode() command will url-encode the enclosed value. See the man page describing the .cf files
 		my $key = $_;
-		$data{$key} =~ s/\$data{(.*?)}/$data{$1}/eg;
-		$data{$key} =~ s/\[(.*?)encode\(\$params{(.*?)}\)(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . operaBugEncode(CGI::escape($Apache::WeSQL::params{$2})) . "$3":"$4")/eg;
-		$data{$key} =~ s/\[(.*?)\$params{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1$Apache::WeSQL::params{$2}$3":"$4")/eg;
-		$data{$key} =~ s/encode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugEncode(CGI::escape($Apache::WeSQL::params{$1})):'')/eg;
+		&Apache::WeSQL::log_error("***** KEY: $key\n");
+ 		$data{$key} =~ s/\$data{(.*?)}/$data{$1}/eg;
+		$data{$key} =~ s/\[([^\]]*?)encode\(\$params{(.*?)}\)(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . operaBugEncode(CGI::escape(&escapequotes($Apache::WeSQL::params{$2},$key))) . "$3":"$4")/eg;
+		$data{$key} =~ s/\[([^\]]*?)\$params{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . &escapequotes($Apache::WeSQL::params{$2},$key) . "$3":"$4")/eg;
+		$data{$key} =~ s/encode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugEncode(CGI::escape(&escapequotes($Apache::WeSQL::params{$1},$key))):'')/eg;
 
-		$data{$key} =~ s/\[(.*?)decode\(\$params{(.*?)}\)(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . operaBugDecode(CGI::unescape($Apache::WeSQL::params{$2})) . "$3":"$4")/eg;
-		$data{$key} =~ s/\[(.*?)\$params{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1$Apache::WeSQL::params{$2}$3":"$4")/eg;
-		$data{$key} =~ s/decode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugDecode(CGI::unescape($Apache::WeSQL::params{$1})):'')/eg;
+		$data{$key} =~ s/\[([^\]]*?)decode\(\$params{(.*?)}\)(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . operaBugDecode(CGI::unescape(&escapequotes($Apache::WeSQL::params{$2},$key))) . "$3":"$4")/eg;
+		$data{$key} =~ s/\[([^\]]*?)\$params{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . &escapequotes($Apache::WeSQL::params{$2},$key) . "$3":"$4")/eg;
+		$data{$key} =~ s/decode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugDecode(CGI::unescape(&escapequotes($Apache::WeSQL::params{$1},$key))):'')/eg;
 
-		$data{$key} =~ s/\$params{(.*?)}/(defined($Apache::WeSQL::params{$1})?$Apache::WeSQL::params{$1}:'')/eg;
-		$data{$key} =~ s/\[(.*?)\$cookies{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::cookies{$2}) && ($Apache::WeSQL::cookies{$2} ne '')?"$1$Apache::WeSQL::cookies{$2}$3":$4)/eg;
-		$data{$key} =~ s/\$cookies{(.*?)}/(defined($Apache::WeSQL::cookies{$1})?$Apache::WeSQL::cookies{$1}:'')/eg;
+		$data{$key} =~ s/\$params{(.*?)}/(defined($Apache::WeSQL::params{$1})?&escapequotes($Apache::WeSQL::params{$1},$key):'')/eg;
+		$data{$key} =~ s/\[(.*?)\$cookies{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::cookies{$2}) && ($Apache::WeSQL::cookies{$2} ne '')?"$1" . &escapequotes($Apache::WeSQL::cookies{$2},$key) . "$3":$4)/eg;
+		$data{$key} =~ s/\$cookies{(.*?)}/(defined($Apache::WeSQL::cookies{$1})?&escapequotes($Apache::WeSQL::cookies{$1},$key):'')/eg;
 		$data{$key} =~ s/dest=caller/"dest=" . operaBugEncode(CGI::escape($r->uri . "?" . $r->args))/eg;
 	}
 	# If we didn't find any data for this view, abort and flag this in the logs!
@@ -341,6 +346,15 @@ sub readConfigFile {
 		exit;
 	}
 	return %data;
+}
+
+# In permissions.cf, single quotes in $params and $cookies occurences in the 
+# validate, validateif, and sqlcondition statements must be escaped!
+sub escapequotes {
+	my ($toescape,$key) = @_;
+	return $toescape if (!($key =~ /^(validate\.|validateif\.|sqlcondition\.)/));
+	$toescape =~ s/\'/\\\'/g;
+	return $toescape;
 }
 
 ############################################################
@@ -430,9 +444,9 @@ sub jValidate {
 		last if (!defined($data{"validate.$cnt"}));
 		if (!(eval($data{"validate.$cnt"}))) {
 			$data{"validatetext.$cnt"} ||= '<font color=#FF0000>A condition has not been met!</font><br>';
-			$retval .= $data{"validatetext.$cnt"};
+			$retval .= &Apache::WeSQL::dolanguages($data{"validatetext.$cnt"});
 		}
-		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: validate EVAL error: " . $@) if $@;  
+		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: validate EVAL error in rule " . $data{"validate.$cnt"} . ": " . $@) if $@;  
 	}
 	# Then the 'validateif' rules!
 	for (my $cnt = 1; $cnt < 101; $cnt++) {
@@ -442,7 +456,7 @@ sub jValidate {
 		if (eval($data{"validateifcondition.$cnt"})) {
 			if (!(eval($data{"validateif.$cnt"}))) {
 				$data{"validateiftext.$cnt"} ||= '<font color=#FF0000>A condition has not been met!</font><br>';
-      	$retval .= $data{"validateiftext.$cnt"};
+      	$retval .= &Apache::WeSQL::dolanguages($data{"validateiftext.$cnt"});
     	}
 		}
 		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: validateif EVAL error: " . $@) if $@;  
@@ -477,7 +491,7 @@ sub jValidate {
 		
 		my $returnvalue = eval $condition;
 		&Apache::WeSQL::log_error("$$: Journalled.pm: jValidate: eval error: condition: $condition gives error: " . $@) if $@;
-		$retval .= $data{"sqlconditiontext.$cnt"} if (!$returnvalue);
+		$retval .= &Apache::WeSQL::dolanguages($data{"sqlconditiontext.$cnt"}) if (!$returnvalue);
 	}
 
 	# And finally the 'preprocess' perl blocks!
@@ -520,7 +534,16 @@ sub jPrepareTest {
 	#		view
 	#		(any names & values of fields that must be initialised with a value upon adding the record)
 
-	&jErrorMessage("Error on the server, contact the webmaster.","jPrepareTest: redirdest not defined") if (!defined($redirdest));
+
+# There is a nasty DBI bug somewhere that messes up sqlExecuteInsert _sometimes_. It seems to be 
+# triggerable by using strange characters in a field (i.e. not just text but also quotes & slashes
+# and things like that. So redirdest sometimes gets not read. Until we get it fixed somehow, default
+# the redirdest to /...
+#	&jErrorMessage("Error on the server, contact the webmaster.","jPrepareTest: redirdest not defined") if (!defined($redirdest));
+	if (!defined($redirdest)) {
+		&Apache::WeSQL::log_error("$$: jPrepareTest: ERROR: redirdest not defined, defaulting to /");
+		$redirdest = '/';
+	}
 	&jErrorMessage("Error on the server, contact the webmaster.","jPrepareTest: view not defined") if (!defined($Apache::WeSQL::params{view}));
 	&jErrorMessage("Error on the server, contact the webmaster.","jPrepareTest: table not defined") if (!defined($data{table}));
 	&jErrorMessage("Error on the server, contact the webmaster.","jPrepareTest: increment not defined") if (!defined($data{increment}));
@@ -550,6 +573,7 @@ sub jPrepareTest {
 sub jAddPrepare {
 	my $dbh = shift;
 	my $cookieheader = shift;
+
 	# There is a bug in Exporter.pm that doesn't allow us to do a 'circular' export:
 	# We export some symbols from WeSQL to WeSQL::Journalled
 	# Try to export some symbols from WeSQL::Journalled to WeSQL at the same time.
@@ -581,6 +605,7 @@ sub jAddPrepare {
 		# First fill in the id of the just added record if necessary
 		$execute =~ s/\#addid/$id/g;
 		eval($execute);
+		&Apache::WeSQL::log_error("$$: executed: $execute");
 		&Apache::WeSQL::log_error("$$: jAdd EVAL ERROR: " . $@) if $@;  #This will log errors from the eval() 
 	}
 	# Finally redirect to wherever we need to go
@@ -651,6 +676,15 @@ sub jUpdatePrepare {
 
 	&jUpdate($dbh,$data{table},\@columns,\@values,
 			"$data{increment}=$Apache::WeSQL::params{$data{increment}}");
+
+	&Apache::WeSQL::log_error("$$: jAdd ERROR: BLA");
+	# See if there are any blocks of perl that we need to execute!
+	my $execute = &Apache::WeSQL::Session::sDelete($dbh,'editpostexecute');
+	if (defined($execute)) {
+		eval($execute);
+		&Apache::WeSQL::log_error("$$: jUpdatePrepare EVAL ERROR: " . $@) if $@;  #This will log errors from the eval() 
+	}
+
 	&Apache::WeSQL::redirect($redirdest,$cookieheader);
 }
 
@@ -763,7 +797,7 @@ See the man page for Apache::WeSQL::Display.pm for more information about that.
 There is one extra feature: by setting a session parameter with name 'editpostexecute', containing valid perl code, you can have a specific block 
 of perl be executed after the execution of the jAdd sub. You can use the string '#addid' if you need to refer to the id of the just added record.
 
-This module is part of the WeSQL package, version 0.52
+This module is part of the WeSQL package, version 0.53
 
 (c) 2000-2002 by Ward Vandewege
 

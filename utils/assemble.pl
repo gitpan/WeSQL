@@ -62,7 +62,7 @@ sub assemble {
 	my %filehash;
 
 	# Now deal with the substitutions
-	while ($body =~ /^(.*?) -> (.*?)$/gm) {
+	while ($body =~ /^(.*?) -> (.*?)\n\n/gsm) {
 		my ($tmp,$tmp2) = ($1,$2);
 		($tmp,$number) = ($tmp =~ /(.*)\.(\d+)$/);
 		$filehash{$tmp}{$number} = $tmp2;

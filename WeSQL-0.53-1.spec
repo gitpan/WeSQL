@@ -1,4 +1,4 @@
-%define ver     0.52
+%define ver     0.53
 %define rel     1
 %define name    WeSQL
 %define rlname  %{name}
@@ -88,10 +88,12 @@ rm -rf $RPM_BUILD_ROOT
 %doc COPYING README CREDITS addressbook html utils %{name}-%{ver}-%{rel}.spec
 
 %changelog
-* Wed May 19 2002 Ward Vandewege <ward@pong.be>
+* Tue May 28 2002 Ward Vandewege <w@wesql.org>
+	Updated to version 0.53
+* Wed May 19 2002 Ward Vandewege <w@wesql.org>
 	Updated to version 0.52
-* Sun Feb 10 2002 Ward Vandewege <ward@pong.be>
+* Sun Feb 10 2002 Ward Vandewege <w@wesql.org>
 	Updated to version 0.51
-* Tue Nov 20 2001 Ward Vandewege <ward@pong.be>
+* Tue Nov 20 2001 Ward Vandewege <w@wesql.org>
   Edited from Glade-Perl.spec by Dermot Musgrove <dermot@glade.perl.connectfree.co.uk>
 
