@@ -1,0 +1,83 @@
+<!-- LAYOUT listheader -->
+<!-- LAYOUT listbody -->
+
+<center>
+<h1>Sample WeSQL application</h1>
+<!-- LAYOUT liststarttable1 -->
+User Management
+<!-- LAYOUT liststarttable2 -->
+<tr><td align=center colspan=2>
+<!-- EVAL PRELIST
+  my $retval = "";
+  my @userinfo = sqlSelect($dbh,"select login,superuser from users where status='1' and id='COOKIE_ID'");
+  if (!defined($userinfo[0])) {
+    return "<b>Something is very, very wrong</b>";
+  }
+  if ('COOKIE_SU' ne '') {
+    my @suinfo = sqlSelect($dbh,"select login,superuser from users where status='1' and id='COOKIE_SU'");
+      if (!defined($suinfo[0])) {
+          return "<b>Something is very, very wrong</b>";
+      }
+    $retval = "You are superuser <b>$suinfo[0]</b>";
+		if ('COOKIE_SU' ne 'COOKIE_ID') {
+			$retval .= ", cloaked as user <b>$userinfo[0]</b>.<br>\n [<a href=uncloak.wsql>Uncloak</a>]";
+		} else {
+			$retval .= ".<br>\n";
+		}
+  }
+  if ($userinfo[1] eq "1") {
+        $retval =~ s/cloaked as user/cloaked as superuser/;
+    }
+  return $retval;
+/EVAL PRELIST -->
+
+<p>
+Use any of the fields to search for people in the database.<br>
+Alternatively, use the links below to get a list of all people in the database.
+</td></tr>
+<form action=jlist.wsql method=get name=one>
+<input type=hidden name=view value=users>
+<xtable>
+<tr>
+<td><b>Login:</b></td>
+<td><input type=textbox name=login>
+<input type=submit name=button value=Search>
+</td>
+</form>
+</tr><tr>
+<td><b>Login:</b></td>
+<td>
+<form action=jlist.wsql method=get name=two>
+<input type=hidden name=view value=users>
+<select name=id>
+<!-- LIST A select id,login from users where status='1' order by login -->
+<option value=A_ID>A_LOGIN</option>
+<!-- /LIST A -->
+</select>
+<input type=submit name=button value=Search>
+</form>
+</td>
+</tr><tr>
+<td><b>Cloak:</b></td>
+<td>
+<form action=cloak.wsql method=get>
+<select name=id>
+<!-- LIST A select id,login from users where status='1' order by login -->
+<option value=A_ID>A_LOGIN</option>
+<!-- /LIST A -->
+</select>
+<input type=submit name=button value=Now>
+</td>
+</tr><tr>
+<td colspan=2 align=center>
+</td>
+</tr>
+</xtable>
+</form>
+<tr><td align=center colspan=2>
+[<a href=jform.wsql?view=user&id=new&editdest=index.wsql>Add User</a>]
+[<a href=jlist.wsql?view=users>List Users</a>]
+</td></tr>
+</center>
+<!-- LAYOUT liststoptable -->
+<!-- LAYOUT listfooter -->

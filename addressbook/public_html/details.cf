@@ -1,0 +1,22 @@
+person
+title:User details
+key:id
+query:select id,firstname,lastname,birthday,email,mobile,im from people where $key=$Apache::WeSQL::params{$key} and status='1' 
+captions:firstname=First Name|lastname=Last Name|mobile=Mobile|birthday=Birthday|email=E-mail|im=Instant Messaging
+replace:epoch=perl;return(strftime "%Y.%m.%e %H:%M:%S", localtime($epoch));
+replace:email=<a href=mailto:$email>$email</a>
+pageheader:<center>some view-specific header</center><br>
+pagefooter:<center>some view-specific footer</center><br>
+append:<center><a href=jform.wsql?id=$id&view=person&editdest=caller>Edit</a></center>&list(view=addresses&peopleid=$id)
+hide:id
+
+address
+title:Address details
+key:id
+query:select id,name,phone from addresses where $key=$Apache::WeSQL::params{$key} and status='1' 
+captions:name=Name|phone=Phone
+replace:email=<a href=mailto:$email>$email</a>
+pageheader:<center>some view-specific header</center><br>
+pagefooter:<center>some view-specific footer</center><br>
+append:<center><a href=jform.wsql?id=$id&view=person&editdest=caller>Edit</a></center>&list(view=addresses&peopleid=$id)
+hide:id

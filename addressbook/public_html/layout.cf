@@ -1,0 +1,61 @@
+listheader
+<html>
+<head>
+
+listbody
+</head>
+<body bgcolor=#FFFFFF>
+<p>
+
+liststarttable1
+<hr width=760>
+<center>
+<table width="750" border="0" cellspacing="0" cellpadding="1">
+<tr><td bgcolor="#000000">
+<table width=100%>
+<tr>
+<td align=left valign=top width=40><a href="index.wsql">Home</a></td>
+<td align=center width=520><font color=FFFFFF><b>
+
+liststarttable2
+</b></font></td>
+<td width=40 valign=top align=right><a href="http://wesql.org">WeSQL.org</a></td>
+</tr>
+</table>
+</td></tr>
+<tr><td bgcolor="#000000">
+<table width="748" border="0" cellspacing="0" cellpadding="5" bgcolor="#e8e8e8">
+<tr>
+
+liststoptable
+</table>
+</td></tr>
+</table>
+<hr width=760>
+
+listfooter
+</center>
+<center>
+<!-- EVAL PRE
+	my $retval = "";
+	if (defined($cookies{su}) && ($cookies{su} ne '0')) {
+		$retval = "<b>To the <a href=/admin/index.wsql>admin</a> interface.</b><br>"
+	}
+	return $retval;
+/EVAL PRE -->
+<a href="jlogout.wsql?redirdest=index.wsql">Logout</a></center><p>
+<font size=-1>
+<center>This page has been generated dynamically with <a href=http://wesql.org>WeSQL v0.50</a><br>
+Copyright (c) 2000,2001 by <a href=mailto:w@wesql.org>Ward Vandewege</a>.<br>
+This program is free software; you can redistribute it and/or modify it under the terms of the GPL.<br>
+Dear Bill, this site is best viewed with ANY browser on ANY platform, unlike your MSN!</center>
+</font>
+</body>
+</html>
+
+publiclogon
+<tr><td><b>Login</b></td><td align=right><b>Password</b></td><td align=right><b>Superuser</b></td></tr>
+<!-- LIST A select login, password, superuser from users where status='1' order by login -->
+<tr><td>A_LOGIN</td><td align=right>A_PASSWORD</td><td align=right><!-- EVAL POST if ('A_SUPERUSER' eq 1) { return "Yes"; } else { return "No"; } --></td></tr>
+<!-- /LIST A -->
+

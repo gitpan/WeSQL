@@ -1,0 +1,36 @@
+<!-- LAYOUT listheader -->
+<!-- LAYOUT listbody -->
+
+<center>
+<h1>Sample WeSQL application</h1>
+<!-- LAYOUT liststarttable1 -->
+People Search
+<!-- LAYOUT liststarttable2 -->
+<tr><td align=center colspan=2>
+
+Use any of the fields to search for people in the database.<br>
+Alternatively, use the links below to get a list of all people in the database.
+</td></tr>
+<form action=jlist.wsql method=get>
+<input type=hidden name=view value=people>
+<tr>
+<td><b>First name:</b></td>
+<td><input type=textbox name=firstname></td>
+</tr><tr>
+<td><b>Last name:</b></td>
+<td><input type=textbox name=lastname></td>
+</tr><tr>
+<td><b>Birthday:</b></td>
+<td><input type=textbox name=birthday></td>
+</tr><tr>
+<td colspan=2 align=center><input type=submit name=button value=Search></td>
+</tr>
+</form>
+<tr><td align=center colspan=2>
+[<a href=jform.wsql?view=person&id=new&editdest=/>Add Person</a>]
+[<a href=jlist.wsql?view=people>List People</a>]
+[<a href=jlist.wsql?view=addresses>List Addresses</a>]
+</td></tr>
+</center>
+<!-- LAYOUT liststoptable -->
+<!-- LAYOUT listfooter -->

@@ -1,0 +1,13 @@
+users
+title:All users
+query:select id,login,password,superuser from users where status='1' [and id like '$params{id}'|] [and login like '%$params{login}%'|] order by login
+captions:login=Login|password=Password|superuser=Superuser
+pagehead:<center><h2>List of Users</h2></center>
+pagefoot:<center>&nbsp;</center><br>
+replace:login=<a href=jdetails.wsql?id=$id&view=user>$login</a>
+replace:superuser=perl;return ($superuser==1?"Yes":"No");
+replace:email=<a href=mailto:$email>$email</a>
+recordsperpage:20
+appendnoresults:<center><a href=jform.wsql?id=new&view=user&editdest=jlist.wsql%3Fview%3Dusers____from%3D[$params{from}|0]>Add</a></center>
+appendresults:<center><a href=jform.wsql?id=new&view=user&editdest=jlist.wsql%3Fview%3Dusers____from%3D[$params{from}|0]>Add</a></center>
+hide:id

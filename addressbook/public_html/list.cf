@@ -1,0 +1,27 @@
+people
+title:All people
+query:select id,firstname,lastname,birthday,email,mobile from people where status='1' [and id like '$params{id}'|] [and firstname like '%$params{firstname}%'|] [and lastname like '%$params{lastname}%'|] [and birthday like '%$params{birthday}%'|] order by lastname
+captions:firstname=First Name|lastname=Last Name|birthday=Birthday|email=E-mail|mobile=Mobile
+align:firstname=right
+pageheader:<center><h2>List of People</h2></center>
+pagefooter:<center>&nbsp;</center><br>
+replace:birthday=<a href=jdetails.wsql?id=$id&view=person>$birthday</a>
+replace:email=<a href=mailto:$email>$email</a>
+recordsperpage:20
+appendnoresults:<center><a href=jform.wsql?id=new&view=person&editdest=jlist.wsql%3Fview%3Dpeople%26from%3D[$params{from}|0]>Add</a></center>
+appendresults:<center><a href=jform.wsql?id=new&view=person&editdest=jlist.wsql%3Fview%3Dpeople%26from%3D[$params{from}|0]>Add</a></center>
+hide:id
+
+addresses
+title:Addresses
+query:select id,peopleid,name,email,phone from addresses where status='1' [and peopleid like '$params{peopleid}'|] order by name
+captions:name=Place|email=E-mail|phone=Phone
+align:firstname=right
+pageheader:<center><h2>Address List</h2></center>
+pagefooter:<center>&nbsp;</center><br>
+replace:name=<a href="jform.wsql?id=$id&view=address&editdest=caller">$name</a>
+replace:email=<a href=mailto:$email>$email</a>
+recordsperpage:20
+appendnoresults:<center><a href=jform.wsql?id=new&view=address&peopleid=$params{peopleid}&editdest=caller>Add</a></center>
+appendresults:<center><a href=jform.wsql?id=new&view=address&peopleid=$params{peopleid}&editdest=caller>Add</a></center>
+hide:id,peopleid

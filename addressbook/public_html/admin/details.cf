@@ -1,0 +1,10 @@
+user
+title:User details
+key:id
+query:select id,login,password,superuser from users where $key=$Apache::WeSQL::params{$key} and status='1' 
+captions:login=Login|password=Password|superuser=Superuser
+replace:superuser=perl;return ($superuser==1?"Yes":"No");
+pagehead:<center>some view-specific header</center><br>
+pagefoot:<center>some view-specific footer</center><br>
+append:<center><a href=jform.wsql?id=$id&view=user&editdest=caller>Edit</a></center>
+hide:id

@@ -1,0 +1,12 @@
+user
+title:Edit user
+titlenew:Add user
+key:id
+query:select id,login,password,superuser from users where $data{key}=$params{$data{key}} and status='1' 
+captions:login=Login|password=Password|superuser=Superuser
+pagehead:<center>some view-specific header</center><br>
+pagefoot:<center>some view-specific footer</center><br>
+form:id=hidden
+form:superuser=select(Yes=1,No=0)
+appendnew:<center>some text to add if this is a NEW record</center>
+appendedit:<center><a href=jdetails.wsql?id=$id&view=user>Details</a> | <a href=jdeleteform.wsql?view=user&id=$id&deldest=jlist.wsql%3Fview%3Dusers>Delete</a></center>

@@ -1,0 +1,10 @@
+user
+table:users
+increment:id
+add:yes
+delete:yes
+update:login,password,superuser
+validate:'$params{superuser}'=~/^(1|0)$/
+validatetext:<font color=#FF0000>The 'superuser' field can only be 1 or 0!</font><br>
+sqlcondition:add|select count(*) from users where login='$params{login}' and status='1'|==|0
+sqlconditiontext:<font color=#FF0000>This user ($params{login}) is already defined!</font><br>

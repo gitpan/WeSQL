@@ -1,0 +1,23 @@
+person
+title:Edit person
+titlenew:Add person
+key:id
+query:select id,firstname,lastname,birthday,email,mobile,im from people where $data{key}=$params{$data{key}} and status='1' 
+captions:firstname=First Name|lastname=Last Name|mobile=Mobile|birthday=Birthday (format yyyy.mm.dd)|email=E-mail|im=Instant Messaging
+pageheader:<center>some view-specific header</center><br>
+pagefooter:<center>some view-specific footer</center><br>
+form:id=hidden
+appendnew:<center>some text to add if this is a NEW record</center>
+appendedit:<center><a href=jdetails.wsql?id=$id&view=person>Details</a> | <a href=jdeleteform.wsql?view=person&id=$id&deldest=jlist.wsql%3Fview%3Dpeople>Delete</a></center>
+
+address
+title:Edit address
+titlenew:Add address
+key:id
+query:select id,peopleid,name,email,phone,fax,street,number,adrs1,adrs2,zip,city,country from addresses where $data{key}=$params{$data{key}} and status='1'
+captions:name=Name|phone=Phone|fax=Fax|street=Street|number=Number|adrs1=Address|adrs2=Address|zip=Zip|city=City|country=Country|peopleid=Person|email=E-mail
+pageheader:<center>some view-specific header</center><br>
+pagefooter:<center>some view-specific footer</center><br>
+form:id=hidden
+form:peopleid=select(select id,firstname,lastname from people where status='1';id=peopleid;value=#id;show=#firstname #lastname)
+appendedit:<center><a href=jdeleteform.wsql?view=address&id=$id&deldest=[encode($params{editdest})|/]>Delete</a></center>

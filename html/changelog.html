@@ -1,0 +1,202 @@
+<html>
+<head>
+<title>WeSQL Changelog</title>
+</head>
+<body bgcolor=#FFFFFF>
+<h1>WeSQL Changelog</h1>
+<table width=800>
+<tr>
+<td>
+v0.50 (2001.12.06): 'Sinterklaas' release!<p>
+This is a complete rewrite of WeSQL, with the following enhancements:
+<ul>
+<li>WeSQL is now a standard Apache Perl module, that can be installed with the usual 'perl Makefile.PL && make && make test && su && make install'.
+<li>Extensive logging in web server logs.
+<li>All code has been moved to Perl modules, which results in greater performance and portability.
+<li>The three level structure (WeSQL.pm, yourmodule.pm, action.cgi) has been reduced to 2 perl modules in the Apache namespace: WeSQL.pm and AppHandler.pm, and a number of other modules for the rest of the functionality. Virtually all intelligence is now contained in WeSQL.pm and its helper modules. AppHandler is the only module that needs to be duplicated to run multiple WeSQL sites on one server. See the Apache::WeSQL man page for more information.
+<li>These modules can now also easily be used from ordinary perl programs, bringing the power of all the (journalled) database subs to your scripts!
+<li>A set of subs, available from EVAL blocks, is now available to read/write/delete values from the current session. See the Apache::WeSQL::Journalled man page for more information.
+<li>Much more complete documentation.
+<li>All documentation (except for this changelog) is available as man pages.
+<li>An RPM is available for Redhat users.
+<li>The code is <b>much</b> cleaner!
+</ul>
+Note that this version break backwards compatibility quite a bit, but that was necessary to get rid of not-so-clever old syntax. Porting your application from an older version to v0.50 is not impossible but might cost some time. You will find that this version actually simplifies things a lot.
+</td>
+</tr>
+<tr><td>&nbsp;</td></tr>
+<tr>
+<td>
+v0.28.02 (2001.04.29):<br>
+<i>New features</i><br>
+<ul>
+<li>Extended edit.wsql and details.wsql to support parameter and table field replacing in the append block, just like list.wsql</li>
+<li>sqlcondition field in the forms file, for use in the modify_journalled sub in <i>yourapplication</i>.pm</li>
+<li>The header and footer files are now also fully treated as wsql files</li>
+<li>A layout file is now supported that allows further layout definition for the output of list.wsql, edit.wsql, and details.wsql. This allows much more freedom than supported before through the header and footer files.</li>
+<li>New way of dealing with superusers and ordinary users, and giving them the right permissions. Superusers now 'cloak' as someone to change their settings and add records on their behalf.</li>
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>(cosmetic) updates of the documentation</li>
+<li>Fixed issue with fields containing single quotes in sub jUpdate in <i>yourapplication</i>.pm</li>
+<li>Fixed bug in jDelete sub, where the cookies{id} value would be empty, effectively rendering this function useless...</i>
+<li>Changed the EVAL block in list.wsql from PRE to POSTINSERT because we include it from details.wsql in the addressbook, and inserting PRE code after the PRE block has been executed results in all sorts of nasty behaviour...</i>
+<li>Fixed the Edit-link in details.wsql, that was broken if the name of the view was different from the table name</li>
+<li>Fixed some serious bugs in edit.wsql that would give people access to records not owned by them... (missing $uidcond all over the place)</li>
+<li>Finally discovered the PostgreSQL equivalent of 'SHOW COLUMNS FROM', and fixed sub build_columnarray in <i>yourapplication</i>.pm once and for all (psql -E is very, very useful!)</li>
+<li>details.wsql now passes all extra paramaters passed to it when deleting a record</li>
+<li>Made replace and relation work together properly in list.wsql</li>
+<li>Now ignore form fields defined in the 'forms' file that refer to unexisting table columns, in edit.wsql</li>
+<li>jUpdate sub now works with PostgreSQL</li>
+<li>Added correct word boundary check in list.wsql for the replace paramater</li>
+<li>File not found errors are now also logged in the apache error log</li>
+</ul>
+v0.28.01 (2001.02.20):<br>
+<i>New features</i><br>
+<ul>
+<li>Added the suid field in the journalling code, which allows 'superusers'</li>
+<li>Extended the documentation (slightly)</li>
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>Added further security checking on the COOKIES and PARAMETERS hashes</li>
+<li>Updated the modify_journalling sub in <i>yourapplication</i>.pm: the pkey variable was entered in an sqlUpdate statement where it shouldn't be...
+<li>The jUpdate sub always dropped the last table element</li>
+<li>Made sql-queries in LIST statements case-insensitive. Can't believe that one survived so long!!</li>
+<li>Fixed the return type of build_columnarray in <i>yourapplication</i>.pm when using PostgreSQL</li>
+</ul>
+v0.28 (2001.02.02):<br>
+<i>New features</i><br>
+<ul>
+<li>The values from checkboxes with multiple values will now all be available in the $queryparams hash, as one pipe-separated value. Ideal for direct use in a RegExp...
+<li>There is a brand new sample-application, a completely working addressbook, built with one html page and some describing files, using the new edit.wsql, list.wsql and details.wsql files described below</li>
+<li>edit.wsql, list.wsql and details.wsql are three WeSQL files that are smart enough to deal with most common database operations: add/modify, and listing/viewing of selections of records. These three files closely cooperate with some subs in the &lt;application&gt;.pm file, and expect a 'journalled' database. They don't ever actually remove records from the database, they just disable them by setting the status to zero. See the <a href="editlistdetails.html">documentation</a> for more information.
+</li>
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>The CUTFILE tag will now only be matched when found just after a \n (newline), and followed immediately by one. This facilitates generating the tag from blocks of Perl.</li>
+<li>Fixed a tricky bug in PARAMCHECK. Parameters with value '0' were changed to '' for the PARAMCHECK.</li>
+<li>Important security fix, disallow passing of WeSQL commands through parameters! UPGRADE to v0.28 or above NOW!! (Thanks to Kristof Verniers for discovering this one!)</li>
+<li>Logging in Apache logs of fatal errors in EVAL blocks</li>
+<li>newapp.pl: fixed some errors in the generation of the recommended http configuration file</li>
+</ul>
+v0.28b15 (2000.10.18):<br>
+<i>New features</i><br>
+<ul>
+<li>Added the INCLUDE tag, which allows inclusion of one WeSQL file in another one. Of course, you want to pass a different set of parameters to this included WeSQL file. Well, you can - just use a prefix :-)</li>
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>Errors from the EVAL statements will now be properly logged in the Apache logs.</li>
+<li>Reviewed sqlInsert2 sub, temporarily fixed a serious problem with comma's that could cause MySQL to choke. This solution is temporary, the sqlInsert2 sub needs serious reviewing.</li>
+<li>Fixed possible 'fetch() without execute()' bugs in the logs, result of doing non-select queries in LIST statements,
+or rather, of trying to retrieve results from these queries.</li>
+Using a LIST for anything else than a select might seem silly at first, but doing an update query that way can surely be handy :-)</li>
+<li>Fixed a few problems with the sqlDisconnect sub in <i>yourapplication</i>.pm</li>
+<li>Fixed nasty bug in PARAMCHECK tag (regexp matching was not doing the right thing)</li>
+<li>The build_columnlist sub, used by the generic add, delete and modify subs, did not work properly on empty tables. 
+Rewrote it to work with empty tables under both MySQL and PostgreSQL.</li>
+<li>Clarified the situation with the alternative values for parameters and other substituted fields. 
+The syntax is now as follows: PR_TEST|[ALTERNATIVE VALUE]. 'ALTERNATIVE VALUE' can now contain any characters (including whitespace), 
+if you want to use a right bracket (]), escape it with a backslash.</li>
+</ul>
+v0.27 (2000.08.09):<br>
+<i>New features</i><br>
+<ul>
+<li>The PARAMCHECK tag has been added. PARAMCHECK allows checking parameters against certain conditions.
+<li>The CUTFILE tag has been added. When the CUTFILE tag is encountered, the rest of the html file will not be shown.
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>Some small fixes in newapp.pl</li>
+<li>Fixed substitution. There was a stupid bug - if something like "PR_XXX" was not matched, the html would be mangled up.</li>
+<li>Fixed issues with escaping single and double quotes in the %queryparams hash. WeSQL now escape both single and double quotes, 
+and not only on the first line of the parameter in the %queryparam hash, like it was before. The things some real-life testing
+can bring up...</li>
+</ul>
+v0.26 (2000.06.10):<br>
+<i>New features</i><br>
+<ul>
+<li>Support for PostgreSQL has been added, and newapp.pl has been updated to reflect the changes. It will now
+ask you whether you have a PostgreSQL or MySQL database.
+<li>AutoCommit is by default off for PostgreSQL, which means that you can decide to commit or rollback yourself 
+if you use the $dbh database handler directly (which, of course, has been possible from the very first version of WeSQL). 
+MySQL does not support transactions, so when you use MySQL this is irrelevant.
+<li>The parsing of files is now modularised. You can decide which actions should be done on a file, and in what order. 
+In addition, you can insert a function of your own at any point in the chain - the only requirement is that you return the processed text, 
+and that you define your function in your package.pm file, so that it can be referenced to from the WeSQL.pm module. 
+See the documentation for more information. 
+As a side effect, the 'MAGIC' string introduced in an earlier version has been dropped.
+<li>Improved error handling: no more 'internal server error' messages when the underlying dababase server is not available.
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>NULL values in the database will now return the string 'NULL' after substitution in the LIST statement. 
+Any 'A_XXX'-like statement in a LIST block, where XXX is not a defined column name, will remain unchanged. 
+Older versions of WeSQL would eat the 'A_' bit, and leave only the 'XXX' bit.
+<li>Now newapp.pl will <b>ask</b> if you want to recreate the database that you want to access with your new application. 
+In previous versions it just dropped and recreated that database. (Ouch!)
+<li>The suggested addition to the httpd.conf file does not contain a DocumentRoot anymore. It was not necessary, 
+and dropping it means that when something goes wrong, there will be _no_ access to your source html files.
+<li>sampleapp's searchsomething.html had links to the wrong page (modify instead of modifyform) :-(
+<li>Fixed several stupid bugs in newapp.pl that would mess things up unless you chose root/test as the credentials
+for your database access. :-((((
+</ul>
+<tr><td>
+v0.25 (2000.05.25):<br>
+<i>New features</i><br>
+<ul>
+<li>A new tool, 'newapp.pl', has been added, to fully automate starting a new application with WeSQL. This greatly facilitates the WeSQL installation procedure.
+<li>Support for cookies has been added. Cookies are now accessible in action.cgi and the *EVAL blocks through the hash %cookies, and in the html files through COOKIE_(uppercase cookie name). 
+<br>They can be set via HTML, with a statement like this in the header:<br>
+&lt;META http-equiv=\"Set-Cookie\" content=\"the=cure;expires=Friday, 31-Dec-01 23:59:59 GMT; path=/\"&gt;.
+<li>Added the sub genericQuery to WeSQL.pm, with which any statement that can be understood by the underlying database can be executed. Results are returned via an object. genericQuery can be used like sqlSelectMany.
+<li>The generic add, modify and del subs that used to reside in action.cgi have been moved to sampleapp.pm.
+In addition, they have become more generic - they will now ignore any form field with a name that is not
+a column name in the table. Keep in mind that the form fields with name 'table' and 'redirdest' still have
+a special meaning!
+</ul>
+<i>Bugfixes</i><br>
+<ul>
+<li>
+Single quotes are now also a separator for PR_XXX and COOKIE_XXX placeholders. 
+Hence, something like "Hello, this is 'PR_ME|Ward' speaking" would be correctly translated to either "Hello, this is 'Ward' speaking" if the parameter 'me' was not set - in older versions, the last single quote would mysteriously disappear.
+</li>
+</ul>
+<p>
+v0.24 (2000.05.23):<br>
+<i>New features</i><br>
+<ul>
+<li>Implemented support for MAGIC string to allow switching off the PREEVAL, PR_, EVAL, LIST and POSTEVAL
+parsing for each html file seperately. This can improve performance greatly in case of huge html-files, and
+can be quite useful for debugging purposes.
+</li>
+</ul>
+v0.23 (2000.05.20):<br>
+<i>New features</i><br>
+<ul>
+<li>
+Added PREEVAL, EVAL, and POSTEVAL tags that allow insertion of perl 
+into the html files. Start building those queries dynamically!
+</li>
+</ul>
+v0.22 (2000.05.19):<br>
+<i>Bugfixes</i><br>
+<ul>
+<li>
+Allow the use of < and > in queries
+</li>
+</ul>
+v0.21 (2000.05.12):<br>
+<i>Bugfixes</i><br>
+<ul>
+<li>
+Column names are now case-insensitive when using sub sqlSelectMany2
+</li>
+</ul>
+</td></tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,23 @@
+person
+table:people
+increment:id
+add:yes
+delete:yes
+update:firstname,lastname,mobile,birthday,email,im
+validate:'$params{birthday}'=~/^\d{2,4}.\d{1,2}.\d{1,2}$/
+validatetext:<font color=#FF0000>A valid date has the format yyyy.mm.dd, for instance 1970.01.01!</font><br>
+sqlcondition:add|select count(*) from people where firstname='$params{firstname}' and lastname='$params{lastname}' and status='1'|==|0
+sqlconditiontext:<font color=#FF0000>This person ($params{firstname} $params{lastname}) is already defined!</font><br>
+validateifcondition:!('$params{mobile}' =~ /^$/)
+validateif:'$params{mobile}' =~ /^\+[\d\s]+/
+validateiftext:<font color=#FF0000>If the 'mobile' field is not empty, it must start with a '+' sign and consist only of digits and spaces!</font><br>
+
+address
+table:addresses
+increment:id
+add:yes
+delete:yes
+update:name,phone,fax,street,number,adrs1,adrs2,zip,city,country,peopleid,email
+validate:!('$params{name}'=~/^$/)
+validatetext:<font color=#FF0000>Give a name to the address!</font><br>
+
