@@ -1,7 +1,7 @@
 user
 title:User details
 key:id
-query:select id,login,password,superuser from users where $key=$Apache::WeSQL::params{$key} and status='1' 
+query:select id,login,password,superuser from users where $data{key}=$Apache::WeSQL::params{$data{key}} and status='1' 
 captions:login=Login|password=Password|superuser=Superuser
 replace:superuser=perl;return ($superuser==1?"Yes":"No");
 pagehead:<center>some view-specific header</center><br>

@@ -37,16 +37,42 @@ listfooter
 </center>
 <center><a href="jlogout.wsql?redirdest=index.wsql">Logout</a></center><p>
 <font size=-1>
-<center>This page has been generated dynamically with <a href=http://wesql.org>WeSQL v0.50</a><br>
-Copyright (c) 2000,2001 by <a href=mailto:w@wesql.org>Ward Vandewege</a>.<br>
+<center>This page has been generated dynamically with <a href=http://wesql.org>WeSQL v0.51</a><br>
+Copyright (c) 2000-2002 by <a href=mailto:w@wesql.org>Ward Vandewege</a>.<br>
 This program is free software; you can redistribute it and/or modify it under the terms of the GPL.<br>
 Dear Bill, this site is best viewed with ANY browser on ANY platform, unlike your MSN!</center>
 </font>
 </body>
 </html>
 
+loginform1
+<tr>
+<td align=center valign=top>
+<br>
+<center>
+<form action="jlogin.wsql" method=post>
+<table width=400>
+<tr><td align=right colspan=2><b>Login:</b></td><td><INPUT name="login"></td></tr>
+<tr><td align=right colspan=2><b>Password:</b></td><td><INPUT name="passwd" type=password></td></tr>
+<tr><td colspan=3 align=center>
+
+loginform2
+<input type="submit" value="Log in"></td></tr>
+
 publiclogon
 <tr><td><b>Login</b></td><td align=right><b>Password</b></td><td align=right><b>Superuser</b></td></tr>
 <!-- LIST A select login, password, superuser from users where status='1' order by login -->
 <tr><td>A_LOGIN</td><td align=right>A_PASSWORD</td><td align=right><!-- EVAL POST if ('A_SUPERUSER' eq 1) { return "Yes"; } else { return "No"; } --></td></tr>
 <!-- /LIST A -->
+
+loginform3
+</table>
+</form>
+</td></tr>
+<tr>
+<td align=center>
+<b>If you get this page time and again, your browser does not support cookies.<br>Enable cookies and try again!</b>
+</td>
+</tr>
+</form>
+

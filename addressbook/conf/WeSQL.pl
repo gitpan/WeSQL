@@ -3,7 +3,7 @@
 # Do not edit unless you know what you are doing!
 
 # This file is part of the Sample Addressbook application
-# shipped with WeSQL v0.50
+# shipped with WeSQL v0.51
 # For more information see http://wesql.org
 
 # You will need to restart the web server after changing
@@ -36,9 +36,9 @@ $dsn = "DBI:mysql:database=addressbook;host=localhost";
 $dbuser = "root";
 $dbpass = "test";
 
-# Set this to zero to disable authentication. Note that jform.wsql and jdeleteform.wsql will NOT work.
-# They need to store session data (editdest, canceldest, deldest), but there is no session when you're 
-# not logged in...
+# Set this to zero to disable authentication. 
+# Note that from v0.51, jform.wsql and jdeleteform.wsql WILL work, as sessions are now not dependant anymore
+# on logging in.
 $authenticate = 1;
 
 # $authsuperuserdir MUST start and end with a / !!

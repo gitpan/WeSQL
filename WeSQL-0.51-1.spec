@@ -1,4 +1,4 @@
-%define ver     0.50
+%define ver     0.51
 %define rel     1
 %define name    WeSQL
 %define rlname  %{name}
@@ -85,9 +85,11 @@ find $RPM_BUILD_ROOT -type f -print|sed -e "s@^$RPM_BUILD_ROOT@@g" > %{filelst}
 rm -rf $RPM_BUILD_ROOT
 
 %files -f %{filelst}
-%doc COPYING README CREDITS addressbook html WeSQL-0.50-1.spec
+%doc COPYING README CREDITS addressbook html %{name}-%{ver}-%{rel}.spec
 
 %changelog
+* Sun Feb 10 2002 Ward Vandewege <ward@pong.be>
+	Updated to version 0.51
 * Tue Nov 20 2001 Ward Vandewege <ward@pong.be>
   Edited from Glade-Perl.spec by Dermot Musgrove <dermot@glade.perl.connectfree.co.uk>
 

@@ -8,6 +8,7 @@ use lib("../");
 
 use Apache::WeSQL;
 use Apache::WeSQL::SqlFunc qw(:all);
+use Apache::WeSQL::Session qw(:all);
 
 use Apache::Constants qw(:common);
 
@@ -19,149 +20,12 @@ our @ISA = qw(Exporter);
 
 our %EXPORT_TAGS = ( 'all' => [ qw(
 	readConfigFile jAdd jUpdate jDelete jAddPrepare jUpdatePrepare jDeletePrepare jErrorMessage 
-	sWrite sDelete sRead sReadAll sOverWrite sDeleteValue
 	operaBugDecode operaBugEncode
 ) ] );
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.50';
-
-############################################################
-# The code for storing and retrieving session-data starts here
-# Prerequisite: a table like the following in your database (this is the MySQL definition):
-# (for the PostgreSQL definition see the sample Addressbook application)
-#create table sessiondata (
-#  pkey bigint(20) unsigned not null auto_increment,
-#  id bigint(20) unsigned not null,
-#
-#  uid bigint(20) unsigned not null,
-#  suid bigint(20) unsigned not NULL default '0',
-#  epoch bigint unsigned not null,
-#  status tinyint default '1' NOT NULL,
-#
-#  loginid bigint(20) unsigned not null,
-#  name varchar(50) default '' not null,
-#  value varchar(255) default '' not null,
-#  primary key (pkey)
-#);
-#
-############################################################
-
-############################################################
-# sWrite
-# sWrite is short for session-write, and can add a piece of information,
-# described by a key and a value, to the session.
-############################################################
-sub sWrite {
-	my ($dbh,$key,$value) = @_;
-	# Now first get the id of the login (effectively, the id of this session)
-	my $id = $Apache::WeSQL::cookies{id};
-	$id = $Apache::WeSQL::cookies{su} if (defined($Apache::WeSQL::cookies{su}));
-	my @login = &sqlSelect($dbh,"select id from logins where userid='$id' and hash='$Apache::WeSQL::cookies{hash}' and status='1'");
-	my @columns = ('name','value','loginid');
-	my @values = ($key,$value,$login[0]);
-	&Apache::WeSQL::log_error("$$: sWrite: add '$key' -> '$value' to session data for login $login[0]") if ($Apache::WeSQL::DEBUG);
-	&jAdd($dbh,"sessiondata",\@columns,\@values,"id");
-}
-
-############################################################
-# sOverWrite
-# sOverWrite is short for session-overwrite.
-# It writes a key/value pair to the session, but overwrites any existing value for this key.
-############################################################
-sub sOverWrite {
-	my ($dbh,$key,$value) = @_;
-	&sDelete($dbh,$key);
-	&sWrite($dbh,$key,$value);
-}
-
-############################################################
-# sRead
-# sRead is short for session-read, and will return 1 value for a specified key,
-# if stored in the session. Returns undef if there is no such key in the session.
-# The optional parameter $sort determines whether the last (default) or the first
-# ($sort = 1) value should be returned, if there is more than one key with this
-# name.
-############################################################
-sub sRead {
-	my ($dbh,$key,$sort) = @_;
-	$sort ||= 0;
-	# Now first get the id of the login (effectively, the id of this session)
-	my $id = $Apache::WeSQL::cookies{id};
-	$id = $Apache::WeSQL::cookies{su} if (defined($Apache::WeSQL::cookies{su}));
-	my @login = &sqlSelect($dbh,"select id from logins where userid='$id' and hash='$Apache::WeSQL::cookies{hash}' and status='1'");
-	# And then retrieve the data
-	my @result = &sqlSelect($dbh,"select value from sessiondata where loginid='$login[0]' and name='$key' and status='1' order by id " . ($sort == 1?"DESC":""));
-	&Apache::WeSQL::log_error("$$: sRead: read session data '$key' for login $login[0], " . ($sort == 1?"last added value":"oldest value")) if ($Apache::WeSQL::DEBUG);
-	return undef if ($#result == -1);
-	return $result[0];
-}
-
-############################################################
-# sReadAll
-# sRead is short for session-read-all, and will return all values for a specified key,
-# if stored in the session. Returns undef if there is no such key in the session.
-# The optional parameter $sort determines whether the sorting should be LIFO or FIFO,
-# if there is more than one key with this name.
-############################################################
-sub sReadAll {
-	my ($dbh,$key,$sort) = @_;
-	$sort ||= 0;
-	# Now first get the id of the login (effectively, the id of this session)
-	my $id = $Apache::WeSQL::cookies{id};
-	$id = $Apache::WeSQL::cookies{su} if (defined($Apache::WeSQL::cookies{su}));
-	my @login = &sqlSelect($dbh,"select id from logins where userid='$id' and hash='$Apache::WeSQL::cookies{hash}' and status='1'");
-	# And then retrieve the data
-	my $c = &sqlSelectMany($dbh,"select value from sessiondata where loginid='$login[0]' and name='$key' and status='1' order by id " . ($sort == 1?"DESC":""));
-	&Apache::WeSQL::log_error("$$: sReadAll: read session data '$key' for login $login[0], order" . ($sort == 1?"LIFO":"FIFO")) if ($Apache::WeSQL::DEBUG);
-	return $c;
-}
-
-############################################################
-# sDelete
-# sDelete is short for session-delete, and can delete 1 piece of information,
-# described by a key, from a session. Returns the value of the deleted key, so you
-# can use sDelete as a 'shift' or 'pop' function.
-# Returns undef when no matching key was found.
-############################################################
-sub sDelete {
-	my ($dbh,$key,$sort) = @_;
-	$sort ||= 0;
-	# Now first get the id of the login (effectively, the id of this session)
-	my $id = $Apache::WeSQL::cookies{id};
-	$id = $Apache::WeSQL::cookies{su} if (defined($Apache::WeSQL::cookies{su}));
-	my @login = &sqlSelect($dbh,"select id from logins where userid='$id' and hash='$Apache::WeSQL::cookies{hash}' and status='1'");
-	# Now get the id of the key to delete
-	my @result = &sqlSelect($dbh,"select id,value from sessiondata where loginid='$login[0]' and name='$key' and status='1' order by id " . ($sort == 1?"DESC":""));
-	if ($Apache::WeSQL::DEBUG) {
-		if ($#result > -1) {
-			&Apache::WeSQL::log_error("$$: sDelete: delete '$key' with id '$result[0]' from session data for login $login[0]");
-		} else {
-			&Apache::WeSQL::log_error("$$: sDelete: '$key' for login $login[0] does not exist");
-		}
-	}
-	return undef if ($#result == -1);
-	&jDelete($dbh,"sessiondata","name='$key' and id='$result[0]'");
-	return ($result[1]);
-}
-
-############################################################
-# sDeleteValue
-# sDeleteValue is short for session-delete-value, and can delete 1 piece of information,
-# described by a key and its value, from a session. 
-############################################################
-sub sDeleteValue {
-	my ($dbh,$key,$value) = @_;
-	# Now first get the id of the login (effectively, the id of this session)
-	my @login = &sqlSelect($dbh,"select id from logins where userid='$Apache::WeSQL::cookies{id}' and hash='$Apache::WeSQL::cookies{hash}' and status='1'");
-	&Apache::WeSQL::log_error("$$: sDeleteValue: delete '$key' with value '$value' from session data for login $login[0]") if ($Apache::WeSQL::DEBUG);
-	&jDelete($dbh,"sessiondata","name='$key' and value='$value'");
-}
-
-############################################################
-# The code for storing and retrieving session-data ends here
-############################################################
+our $VERSION = '0.51';
 
 ############################################################
 # jAdd
@@ -304,7 +168,7 @@ sub jUpdate {
 # parameter 3: $where: condition of the sql query
 # parameter 4: $uid: user id	(optional, defaults to the value of the cookie uid, if any)
 # parameter 5: $suid: superuser id (optional, defaults to the value of the cookie suid, if any)
-# parameter 6: $pkey: name of the autoincrement column, defaults to 'pkey'
+# parameter 6: $pkey: name of the autoincrement column (optional, defaults to 'pkey')
 ############################################################
 sub jDelete { 
 	my ($dbh,$table,$where,$uid,$suid,$pkey) = @_;
@@ -392,9 +256,12 @@ sub readConfigFile {
 	my $uri = $r->uri;
 	my ($baseuri) = ($uri =~ /^(.+)\//);
 	$baseuri .= '/';
-	&Apache::WeSQL::log_error("$$: Journalled.pm: readConfigFile: opening $file with baseuri $baseuri and uri: " . $r->uri) if ($Apache::WeSQL::DEBUG);
-	if (!defined(open(DEFINITIONS,$r->document_root . $baseuri . "$file"))) {
-		&Apache::WeSQL::log_error("$$: Journalled.pm: readConfigFile: file '" . $r->document_root . "$baseuri\L$file' not found!");
+
+	my $doc_root = $r->document_root;	
+
+	&Apache::WeSQL::log_error("$$: Journalled.pm: readConfigFile: opening $doc_root\L$baseuri\L$file for uri: " . $r->uri) if ($Apache::WeSQL::DEBUG);
+	if (!defined(open(DEFINITIONS,$doc_root . $baseuri . "$file"))) {
+		&Apache::WeSQL::log_error("$$: Journalled.pm: readConfigFile: file '$doc_root\L$baseuri\L$file' not found!");
 		&jErrorMessage("Configuration file not found! Please contact the webmaster.","Can't read $file!");
 		exit;
 	}
@@ -421,7 +288,7 @@ sub readConfigFile {
 					my ($column,$title) = split("=",$_);
 		  		$data{lc($type) . ".$column"} = $title;
 				}
-			} elsif (lc($type) =~ /^(replace|form)$/) {	# 'replace' for jList and jDetails, 'form' for jForm
+			} elsif (lc($type) =~ /^(replace|form|hideifdefault)$/) {	# 'replace' for jList and jDetails, 'form' for jForm, 'hideifdefault' for jDetails
 				my ($param1, $param2) = split(/=/,$body,2);
 				$data{lc($type) . ".$param1"} = $param2;
 			} elsif (lc($type) =~ /^(sqlcondition|sqlconditiontext|validate|validateif|validateifcondition|validatetext|validateiftext)/) {	# For jValidate/jForm only
@@ -447,9 +314,9 @@ sub readConfigFile {
 		$data{$key} =~ s/\[(.*?)\$params{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1$Apache::WeSQL::params{$2}$3":"$4")/eg;
 		$data{$key} =~ s/encode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugEncode(CGI::escape($Apache::WeSQL::params{$1})):'')/eg;
 
-		$data{$key} =~ s/\[(.*?)decode\(\$params{(.*?)}\)(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . operaBugDecode(CGI::escape($Apache::WeSQL::params{$2})) . "$3":"$4")/eg;
+		$data{$key} =~ s/\[(.*?)decode\(\$params{(.*?)}\)(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1" . operaBugDecode(CGI::unescape($Apache::WeSQL::params{$2})) . "$3":"$4")/eg;
 		$data{$key} =~ s/\[(.*?)\$params{(.*?)}(.*?)(?<!\\)\|(.*?)\]/(defined($Apache::WeSQL::params{$2}) && ($Apache::WeSQL::params{$2} ne '')?"$1$Apache::WeSQL::params{$2}$3":"$4")/eg;
-		$data{$key} =~ s/decode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugDecode(CGI::escape($Apache::WeSQL::params{$1})):'')/eg;
+		$data{$key} =~ s/decode\(\$params{(.*?)}\)/(defined($Apache::WeSQL::params{$1})?operaBugDecode(CGI::unescape($Apache::WeSQL::params{$1})):'')/eg;
 
 		$data{$key} =~ s/\$params{(.*?)}/(defined($Apache::WeSQL::params{$1})?$Apache::WeSQL::params{$1}:'')/eg;
 		$data{$key} =~ s/\$cookies{(.*?)}/(defined($Apache::WeSQL::cookies{$1})?$Apache::WeSQL::cookies{$1}:'')/eg;
@@ -458,7 +325,7 @@ sub readConfigFile {
 	}
 	# If we didn't find any data for this view, abort and flag this in the logs!
 	if (scalar keys %data == 0) {
-		&jErrorMessage("Journalled.pm: readConfigFile: View not found. Please contact the webmaster.","view '$view' not found in " . $r->document_root . "/$file");
+		&jErrorMessage("Journalled.pm: readConfigFile: View not found. Please contact the webmaster.","view '$view' not found in $doc_root\L$baseuri\L$file");
 		exit;
 	}
 	return %data;
@@ -612,9 +479,9 @@ sub jPrepareTest {
 	my $view = $Apache::WeSQL::params{view};
 	my $redirdest;
 	if ($type eq 'delete') {
-		$redirdest = &sRead($dbh,"deldest$view");
+		$redirdest = &Apache::WeSQL::Session::sRead($dbh,"deldest$view");
 	} else {
-		$redirdest = &sRead($dbh,"editdest$view");
+		$redirdest = &Apache::WeSQL::Session::sRead($dbh,"editdest$view");
 	}
 	my %data = &readConfigFile("permissions.cf",$view);
 
@@ -634,9 +501,9 @@ sub jPrepareTest {
 
 	# Form's been validated, remove the destinations in the database!
 	if ($type eq 'delete') {
-		&sDelete($dbh,"deldest$view");
+		&Apache::WeSQL::Session::sDelete($dbh,"deldest$view");
 	} else {
-		&sDelete($dbh,"editdest$view");
+		&Apache::WeSQL::Session::sDelete($dbh,"editdest$view");
 	}
 
 	delete($Apache::WeSQL::params{view});
@@ -645,13 +512,14 @@ sub jPrepareTest {
 
 ############################################################
 # jAddPrepare
-# Translates a request to /add into a request that jAdd can understand,
+# Translates a request to /jAdd.wsql into a request that jAdd can understand,
 # provided all prerequisites have been fulfilled (like the appropriate
 # lines in the 'permissions.cf' file, and the appropriate parameters
 # passed)
 ############################################################
 sub jAddPrepare {
 	my $dbh = shift;
+	my $cookieheader = shift;
 	# There is a bug in Exporter.pm that doesn't allow us to do a 'circular' export:
 	# We export some symbols from WeSQL to WeSQL::Journalled
 	# Try to export some symbols from WeSQL::Journalled to WeSQL at the same time.
@@ -662,17 +530,29 @@ sub jAddPrepare {
 
 	my ($view,$redirdest,%data) = jPrepareTest($dbh,"add");
 
+	my ($colarrayref, $colhashref) = &buildColumnList($dbh,$data{table});
+
 	my (@columns,@values);
 	foreach (keys %Apache::WeSQL::params) {
 		next if ($_ eq "epoch");
 		next if ($_ eq "status");
 		next if ($_ eq "uid");
 		next if ($_ eq "suid");
-		push(@columns,$_);
-		push(@values,$Apache::WeSQL::params{$_});
+		if (defined(${$colhashref}{$_})) {	# Only consider those parameters corresponding to columns in the table
+			push(@columns,$_);
+			push(@values,$Apache::WeSQL::params{$_});
+		}
 	}
-	&jAdd($dbh,$data{table},\@columns,\@values,$data{increment});
-	&Apache::WeSQL::redirect($redirdest);
+	my ($id,$junk) = &jAdd($dbh,$data{table},\@columns,\@values,$data{increment});
+
+	# See if there are any blocks of perl that we need to execute!
+	my $execute = &Apache::WeSQL::Session::sDelete($dbh,'editpostexecute');
+	# First fill in the id of the just added record if necessary
+	$execute =~ s/\#addid/$id/g;
+	eval($execute);
+	&Apache::WeSQL::log_error("$$: jAdd EVAL ERROR: " . $@) if $@;  #This will log errors from the eval() 
+	# Finally redirect to wherever we need to go
+	&Apache::WeSQL::redirect($redirdest,$cookieheader);
 }
 
 ############################################################
@@ -684,26 +564,23 @@ sub jAddPrepare {
 ############################################################
 sub jDeletePrepare {
 	my $dbh = shift;
+	my $cookieheader = shift;
 
 	my ($view,$deldest,%data) = jPrepareTest($dbh,"delete");
 
 	if (defined($Apache::WeSQL::params{cancel}) && ($Apache::WeSQL::params{cancel} eq "Cancel")) {
-		my $canceldest = &sDelete($dbh,"canceldest$view");
-		&sDelete($dbh,"deldest$view");	# Delete the deldest, we won't need that anymore!
+		my $canceldest = &Apache::WeSQL::Session::sDelete($dbh,"canceldest$view");
+		&Apache::WeSQL::Session::sDelete($dbh,"deldest$view");	# Delete the deldest, we won't need that anymore!
 		&Apache::WeSQL::redirect($canceldest);
 	}
 
 	# No id number given!
-#	if (!defined($Apache::WeSQL::params{$data{increment}})) {
 	&jErrorMessage("Error on the server, contact the webmaster.","jDeletePrepare: id to delete not defined") if (!defined($Apache::WeSQL::params{$data{increment}}));
-#		my $body = jError();
-#		return ($body,0);
-#	}
 
 	&jDelete($dbh,$data{table},"$data{increment}=$Apache::WeSQL::params{$data{increment}}");
-	&sDelete($dbh,"canceldest$view"); # Delete the canceldest, we won't need that anymore!
-	&sDelete($dbh,"editdest$view"); # Delete the editdest for this view, we won't need that anymore!
-	&Apache::WeSQL::redirect($deldest);
+	&Apache::WeSQL::Session::sDelete($dbh,"canceldest$view"); # Delete the canceldest, we won't need that anymore!
+	&Apache::WeSQL::Session::sDelete($dbh,"editdest$view"); # Delete the editdest for this view, we won't need that anymore!
+	&Apache::WeSQL::redirect($deldest,$cookieheader);
 }
 
 ############################################################
@@ -715,6 +592,7 @@ sub jDeletePrepare {
 ############################################################
 sub jUpdatePrepare {
 	my $dbh = shift;
+	my $cookieheader = shift;
 
 	my ($view,$redirdest,%data) = jPrepareTest($dbh,"update");
 
@@ -737,15 +615,11 @@ sub jUpdatePrepare {
 	}
 
 	# No id number given!
-#	if (!defined($Apache::WeSQL::params{$data{increment}})) {
-#		my $body = jError();
 	&jErrorMessage("Error on the server, contact the webmaster.","jUpdatePrepare: id to update not defined") if (!defined($Apache::WeSQL::params{$data{increment}}));
-#		return ($body,0);
-#	}
 
 	&jUpdate($dbh,$data{table},\@columns,\@values,
 			"$data{increment}=$Apache::WeSQL::params{$data{increment}}");
-	&Apache::WeSQL::redirect($redirdest);
+	&Apache::WeSQL::redirect($redirdest,$cookieheader);
 }
 
 ############################################################
@@ -849,34 +723,22 @@ Of course, for all this business with users and logging in to work, you will nee
       primary key (pkey)
     );
 
-=head1 SESSION DATA
+=head2 jAdd.wsql
 
-This module also contains some code for storing and retrieving data in a user session. This code is used by the jform, jdetails and jlist code in the Apache::WeSQL::Display module. It needs a table called 'sessiondata' in your database, which is defined as follows (MySQL definition):
-(for the PostgreSQL definition see the sample Addressbook application)
+By calling /jAdd.wsql urls you can have records added to your database - provided they match certain rules set up in permissions.cf of course.
+See the man page for Apache::WeSQL::Display.pm for more information about that.
 
-    create table sessiondata (
-      pkey bigint(20) unsigned not null auto_increment,
-      id bigint(20) unsigned not null,
+There is one extra feature: by setting a session parameter with name 'editpostexecute' you can have a specific block of perl be executed after 
+the execution of the jAdd sub. You can use the string '#addid' if you need to refer to the id of the just added record.
 
-      uid bigint(20) unsigned not null,
-      suid bigint(20) unsigned not NULL default '0',
-      epoch bigint unsigned not null,
-      status tinyint default '1' NOT NULL,
+This module is part of the WeSQL package, version 0.51
 
-      loginid bigint(20) unsigned not null,
-      name varchar(50) default '' not null,
-      value varchar(255) default '' not null,
-      primary key (pkey)
-    );
-
-The subs for reading/writing/deleting session data are: sWrite sDelete sRead sReadAll sOverWrite sDeleteValue. You can use these in EVAL blocks in wesql files.
-For more information, have a look at the source code of the Apache::WeSQL::Journalling module.
+(c) 2000-2002 by Ward Vandewege
 
 =head1 EXPORT
 
 None by default. Possible: 
 	readConfigFile jAdd jUpdate jDelete jAddPrepare jUpdatePrepare jDeletePrepare jErrorMessage 
-	sWrite sDelete sRead sReadAll sOverWrite sDeleteValue
 	operaBugDecode operaBugEncode
 
 =head1 AUTHOR

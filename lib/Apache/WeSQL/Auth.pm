@@ -22,12 +22,12 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # Preloaded methods go here.
 ############################################################
 # authenticate
-# Almost every call to an url passes through this sub (there is a call
+# Almost every call to an url passes through this sub (there is a line
 # in AppHandler.pm that makes sure of this). This sub checks if
 # a user is properly authenticated, and if not, redirects the request
 # to jloginform.wsql, passing the redirdest along. If the user is properly
@@ -44,13 +44,13 @@ sub authenticate {
 	&Apache::WeSQL::log_error("$$: Auth.pm: authenticate: called with sudir: $superuserdir, authsuper: $authsuper and uri: " . $r->uri) if ($Apache::WeSQL::DEBUG);
 	if (($ENV{REQUEST_URI} =~ /^$superuserdir/) && ($authsuper == 1)) {
 		$redirstr = $superuserdir . 'jloginform.wsql?redirdest=';
-		$Apache::WeSQL::cookies{su} ||= -1;
-		$Apache::WeSQL::cookies{hash} ||= -1;
+		$Apache::WeSQL::cookies{id} = -1 if (!defined($Apache::WeSQL::cookies{id}));
+		$Apache::WeSQL::cookies{hash} = -1 if (!defined($Apache::WeSQL::cookies{hash}));
 		$sql = "select hash from logins,users where logins.userid=users.id and userid='$Apache::WeSQL::cookies{su}' " . 
 						"and hash='$Apache::WeSQL::cookies{hash}' and logins.status='1' and users.status='1' and users.superuser='1'";
 	} else {
-		$Apache::WeSQL::cookies{id} ||= -1;
-		$Apache::WeSQL::cookies{hash} ||= -1;
+		$Apache::WeSQL::cookies{id} = -1 if (!defined($Apache::WeSQL::cookies{id}));
+		$Apache::WeSQL::cookies{hash} = -1 if (!defined($Apache::WeSQL::cookies{hash}));
 		$redirstr = 'jloginform.wsql?redirdest=';
 		$sql = "select hash from logins where userid='$Apache::WeSQL::cookies{id}' and hash='$Apache::WeSQL::cookies{hash}' and status='1'";
 	}
@@ -61,18 +61,29 @@ sub authenticate {
 		&Apache::WeSQL::redirect($redirstr . $escaped);
 	}
 	# Check if this request comes from a user that is logged in!
-	if (defined($Apache::WeSQL::cookies{id}) && defined($Apache::WeSQL::cookies{hash})) {
-		@logincheck = &sqlSelect($dbh,$sql);
-		$logincheck[0] ||= 0;
-	} else {
-		$Apache::WeSQL::cookies{hash} ||= '';
-	}
-	if ($Apache::WeSQL::cookies{hash} ne $logincheck[0]) {
+	@logincheck = &sqlSelect($dbh,$sql);
+	if (!defined($logincheck[0]) || ($Apache::WeSQL::cookies{hash} ne $logincheck[0])) {
 		my $request_uri = $ENV{REQUEST_URI};
 		$request_uri ||= "";
 		my $escaped = CGI::escape($request_uri);
 		&Apache::WeSQL::redirect($redirstr . $escaped);
 	}
+}
+
+############################################################
+# loggedin
+# loggedin return 1 when the user is logged in and 0 when (s)he is not.
+############################################################
+sub loggedin {
+	my $dbh = shift;
+	my $sql = "select hash from logins where userid='$Apache::WeSQL::cookies{id}' and hash='$Apache::WeSQL::cookies{hash}' and status='1'";
+	if (defined($Apache::WeSQL::cookies{id}) && defined($Apache::WeSQL::cookies{hash})) {
+		my @logincheck = &sqlSelect($dbh,$sql);
+		if (defined($logincheck[0]) && ($Apache::WeSQL::cookies{hash} eq $logincheck[0])) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 ############################################################
@@ -87,7 +98,7 @@ sub jLogout {
 	my $request_uri = $Apache::WeSQL::params{redirdest};
 	$request_uri ||= "/";
 	my $escaped = CGI::escape($request_uri);
-	&Apache::WeSQL::redirect('jloginform.wsql?redirdest=' . $escaped);
+	&Apache::WeSQL::redirect($request_uri);
 }
 
 ############################################################
@@ -114,18 +125,20 @@ sub jLogin {
 		&Apache::WeSQL::log_error("$$: Auth.pm: jLogin: wrong password!") if ($Apache::WeSQL::DEBUG);
 		&sqlGeneric($dbh,"UPDATE logins set status='0' where userid='$Apache::WeSQL::cookies{$type}'") if defined($Apache::WeSQL::cookies{$type});
 		my $request_uri = $Apache::WeSQL::params{redirdest};
-  	$request_uri ||= "";
+  	$request_uri ||= "index.wsql";
 	  my $escaped = CGI::escape($request_uri);
   	&Apache::WeSQL::redirect('jloginform.wsql?redirdest=' . $escaped);
 	} else {
+		my $request_uri = $Apache::WeSQL::params{redirdest};
+  	$request_uri ||= "index.wsql";
 		&Apache::WeSQL::log_error("$$: Auth.pm: jLogin: right password!") if ($Apache::WeSQL::DEBUG);
 		&sqlGeneric($dbh,"UPDATE logins set status='0' where userid='$logincheck[0]'");
 		my $hashstr = join ('', ('.', '/', 0..9, 'A'..'Z', 'a'..'z')[rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64, rand 64]);
 		my @cols = ('userid','hash');
 		my @vals = ($logincheck[0],$hashstr);
 		jAdd($dbh,"logins",\@cols,\@vals,'id',$logincheck[0]);
-		print "HTTP/1.0 302 Redirect\r\n";
-		print "Location: $Apache::WeSQL::params{redirdest}\r\n";
+		print "HTTP/1.1 302 Redirect\r\n";
+		print "Location: $request_uri\r\n";
 		print "Set-Cookie: id=$logincheck[0]\r\n";
 		print "Set-Cookie: hash=$hashstr\r\n";
 		print "Content-type:text/html\r\n\r\n";
@@ -135,7 +148,7 @@ sub jLogin {
 <TITLE>302 Found</TITLE>
 </HEAD><BODY>
 <H1>Found</H1>
-The document has moved <A HREF="$Apache::WeSQL::params{redirdest}">here</A>.<P>
+The document has moved <A HREF="$request_uri">here</A>.<P>
 <HR>
 <ADDRESS>Apache Server</ADDRESS>
 </BODY></HTML>
@@ -151,15 +164,19 @@ EOF
 ############################################################
 sub jLoginForm {
 	my $body;
+	my $cookieheader = shift;
   my $dd = localtime();
 	my %layout = &Apache::WeSQL::readLayoutFile('layout.cf');
 	# Protect against 'Use of uninitialized value in concatenation...' errors in the log files!
 	$layout{listheader} ||= ''; $layout{listbody} ||= ''; $layout{liststarttable1} ||= ''; $layout{liststarttable2} ||= '';
 	$layout{publiclogon} ||= ''; $layout{liststoptable} ||= ''; $layout{listfooter} ||= '';
-	$body = <<"EOF";
-HTTP/1.0 200 OK
+	$body = <<EOF;
+HTTP/1.1 200 OK
 Date: $dd
 Server: Apache
+EOF
+	$body .= "$cookieheader\r\n" if (defined($cookieheader));
+	$body .= <<EOF;
 Connection: close
 Content-type: text/html
 
@@ -169,27 +186,11 @@ $layout{listbody}
 $layout{liststarttable1}
 <center><b>Log In</b></center>
 $layout{liststarttable2}
-<tr>
-<td align=center valign=top>
-<br>
-<center>
-<form action="jlogin.wsql" method=post>
-<table>
-<tr><td>Login</td><td><INPUT name="login"></td></tr>
-<tr><td>Password</td><td><INPUT name="passwd" type=password></td></tr>
-<tr><td colspan=2 align=center>
+$layout{loginform1}
 <input type=hidden name=redirdest value="$Apache::WeSQL::params{redirdest}">
-<input type="submit" value="Log in"></td></tr>
+$layout{loginform2}
 $layout{publiclogon}
-</table>
-</form>
-</td></tr>
-<tr>
-<td align=center>
-<b>If you get this page time and again, your browser does not support cookies.<br>Enable cookies and try again!</b>
-</td>
-</tr>
-</form>
+$layout{loginform3}
 $layout{liststoptable}
 $layout{listfooter}
 
@@ -215,9 +216,9 @@ of authentication support, that is, because you could easily implement your own.
 
 This module is called from AppHandler.pm, and WeSQL.pm
 
-This module is part of the WeSQL package, version 0.50
+This module is part of the WeSQL package, version 0.51
 
-(c) 2000-2001 by Ward Vandewege
+(c) 2000-2002 by Ward Vandewege
 
 =head2 EXPORT
 

@@ -12,6 +12,19 @@ create table logins (
 	primary key (pkey)
 );
 
+create table sessions (
+	pkey SERIAL,
+	id bigint not null,
+
+	uid bigint not null,
+	suid bigint default '0' not null,
+	epoch bigint not null,
+	status boolean default '1' NOT NULL,
+
+	hash varchar(16) default '' not null,
+	primary key (pkey)
+);
+
 create table users (
 	pkey SERIAL,
 	id bigint not null,
@@ -37,7 +50,7 @@ create table sessiondata (
 	epoch bigint not null,
 	status boolean default '1' NOT NULL,
 
-  loginid bigint not null,
+  sessionid bigint not null,
   name varchar(50) default '' not null,
   value varchar(255) default '' not null,
   primary key (pkey)

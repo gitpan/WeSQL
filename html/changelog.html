@@ -7,7 +7,31 @@
 <table width=800>
 <tr>
 <td>
-v0.50 (2001.12.06): 'Sinterklaas' release!<p>
+<b>v0.51 (2002.02.14): Valentine release</b><p>
+<ul>
+<li>Added 'hideifdefault' for jdetails.wsql, allowing to hide records if they match a default value
+<li>Extended the session support. It now works without logging in, and more functions are available for manipulating the session data.
+<li>Fixed the logging of errors from EVAL blocks in the webserver log files (finally!).
+<li>Added a mechanism for execution of blocks of perl after a record has been added by the jAdd.wsql system. It works through a session variable called 'editpostexecute' that can be set. See the Apache::WeSQL::Journalled man page for more information.
+<li>Calls to jloginform.wsql without specifying a redirdest parameter will redirect to index.wsql in the same directory, instead of going haywire.
+<li>The default return destination (i.e. when editdest is not defined through the web call or in the .cf file) after a call to jupdate.wsql is now the HTTP_REFERER
+<li>Fixed a security problem where theoretically someone who 1. read the source and 2. was crafty with cookies could access pages without logging on... The problem was introduced in v0.50
+<li>Added a 'loggedin' sub in Auth.pl which returns 1 when a user is logged in and 0 when not.
+<li>jlogout.wsql will now correctly redirect to what is passed in the parameter 'redirdest', instead of to jloginform?redirdest=&lt;valueofredirdest&gt;
+<li>Put all html from jloginform.wsql in the layout.cf file where it belongs.
+<li>Added support for 'textarea' form elements in jform.wsql
+<li>Removed inconsistency where $key in the details.cf file (only!) would be translated to $data{key}. Use $data{key} there from now on, like in the other .cf files.
+<li>Extended syntax for select() form element in form.cf slightly: you can now put several selects, one after the other.
+<li>The decode() call in .cf files will now correctly <i>de</i>code instead of re-encode whatever is passed as its parameter.
+<li>Removed some debug output in the PARAMCHECK processing code, and fixed the PARAMCHECK example in the Apache::WeSQL man page.
+<li>Fixed the perpetual redirection bug (happened for browsers/spiders with cookies disabled).
+</ul>
+For the upgrade path from v0.50, consult the <a href=upgrade.html>Upgrade</a> page.<p>&nbsp;
+</td>
+</tr>
+<tr>
+<td>
+<b>v0.50 (2001.12.06): 'Sinterklaas' release!</b><p>
 This is a complete rewrite of WeSQL, with the following enhancements:
 <ul>
 <li>WeSQL is now a standard Apache Perl module, that can be installed with the usual 'perl Makefile.PL && make && make test && su && make install'.
@@ -21,13 +45,13 @@ This is a complete rewrite of WeSQL, with the following enhancements:
 <li>An RPM is available for Redhat users.
 <li>The code is <b>much</b> cleaner!
 </ul>
-Note that this version break backwards compatibility quite a bit, but that was necessary to get rid of not-so-clever old syntax. Porting your application from an older version to v0.50 is not impossible but might cost some time. You will find that this version actually simplifies things a lot.
+Note that this version breaks backwards compatibility quite a bit, but that was necessary to get rid of not-so-clever old syntax. Porting your application from an older version to v0.50 is not impossible but might cost some time. You will find that this version actually simplifies the use of the library a lot.
 </td>
 </tr>
 <tr><td>&nbsp;</td></tr>
 <tr>
 <td>
-v0.28.02 (2001.04.29):<br>
+<b>v0.28.02 (2001.04.29):</b><br>
 <i>New features</i><br>
 <ul>
 <li>Extended edit.wsql and details.wsql to support parameter and table field replacing in the append block, just like list.wsql</li>
@@ -52,7 +76,7 @@ v0.28.02 (2001.04.29):<br>
 <li>Added correct word boundary check in list.wsql for the replace paramater</li>
 <li>File not found errors are now also logged in the apache error log</li>
 </ul>
-v0.28.01 (2001.02.20):<br>
+<b>v0.28.01 (2001.02.20):</b><br>
 <i>New features</i><br>
 <ul>
 <li>Added the suid field in the journalling code, which allows 'superusers'</li>
@@ -66,7 +90,7 @@ v0.28.01 (2001.02.20):<br>
 <li>Made sql-queries in LIST statements case-insensitive. Can't believe that one survived so long!!</li>
 <li>Fixed the return type of build_columnarray in <i>yourapplication</i>.pm when using PostgreSQL</li>
 </ul>
-v0.28 (2001.02.02):<br>
+<b>v0.28 (2001.02.02):</b><br>
 <i>New features</i><br>
 <ul>
 <li>The values from checkboxes with multiple values will now all be available in the $queryparams hash, as one pipe-separated value. Ideal for direct use in a RegExp...
@@ -82,7 +106,7 @@ v0.28 (2001.02.02):<br>
 <li>Logging in Apache logs of fatal errors in EVAL blocks</li>
 <li>newapp.pl: fixed some errors in the generation of the recommended http configuration file</li>
 </ul>
-v0.28b15 (2000.10.18):<br>
+<b>v0.28b15 (2000.10.18):</b><br>
 <i>New features</i><br>
 <ul>
 <li>Added the INCLUDE tag, which allows inclusion of one WeSQL file in another one. Of course, you want to pass a different set of parameters to this included WeSQL file. Well, you can - just use a prefix :-)</li>
@@ -102,7 +126,7 @@ Rewrote it to work with empty tables under both MySQL and PostgreSQL.</li>
 The syntax is now as follows: PR_TEST|[ALTERNATIVE VALUE]. 'ALTERNATIVE VALUE' can now contain any characters (including whitespace), 
 if you want to use a right bracket (]), escape it with a backslash.</li>
 </ul>
-v0.27 (2000.08.09):<br>
+<b>v0.27 (2000.08.09):</b><br>
 <i>New features</i><br>
 <ul>
 <li>The PARAMCHECK tag has been added. PARAMCHECK allows checking parameters against certain conditions.
@@ -116,7 +140,7 @@ v0.27 (2000.08.09):<br>
 and not only on the first line of the parameter in the %queryparam hash, like it was before. The things some real-life testing
 can bring up...</li>
 </ul>
-v0.26 (2000.06.10):<br>
+<b>v0.26 (2000.06.10):</b><br>
 <i>New features</i><br>
 <ul>
 <li>Support for PostgreSQL has been added, and newapp.pl has been updated to reflect the changes. It will now
@@ -145,7 +169,7 @@ and dropping it means that when something goes wrong, there will be _no_ access 
 for your database access. :-((((
 </ul>
 <tr><td>
-v0.25 (2000.05.25):<br>
+<b>v0.25 (2000.05.25):</b><br>
 <i>New features</i><br>
 <ul>
 <li>A new tool, 'newapp.pl', has been added, to fully automate starting a new application with WeSQL. This greatly facilitates the WeSQL installation procedure.
@@ -166,7 +190,7 @@ Hence, something like "Hello, this is 'PR_ME|Ward' speaking" would be correctly 
 </li>
 </ul>
 <p>
-v0.24 (2000.05.23):<br>
+<b>v0.24 (2000.05.23):</b><br>
 <i>New features</i><br>
 <ul>
 <li>Implemented support for MAGIC string to allow switching off the PREEVAL, PR_, EVAL, LIST and POSTEVAL
@@ -174,7 +198,7 @@ parsing for each html file seperately. This can improve performance greatly in c
 can be quite useful for debugging purposes.
 </li>
 </ul>
-v0.23 (2000.05.20):<br>
+<b>v0.23 (2000.05.20):</b><br>
 <i>New features</i><br>
 <ul>
 <li>
@@ -182,14 +206,14 @@ Added PREEVAL, EVAL, and POSTEVAL tags that allow insertion of perl
 into the html files. Start building those queries dynamically!
 </li>
 </ul>
-v0.22 (2000.05.19):<br>
+<b>v0.22 (2000.05.19):</b><br>
 <i>Bugfixes</i><br>
 <ul>
 <li>
 Allow the use of < and > in queries
 </li>
 </ul>
-v0.21 (2000.05.12):<br>
+<b>v0.21 (2000.05.12):</b><br>
 <i>Bugfixes</i><br>
 <ul>
 <li>

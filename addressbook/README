@@ -1,4 +1,4 @@
-Sample Addressbook Application for Apache::WeSQL version 0.50
+Sample Addressbook Application for Apache::WeSQL version 0.51
 =============================================================
 
 This directory contains the 'sample' application, basically an Addressbook application for WeSQL.
@@ -72,7 +72,7 @@ I usually make a separate Virtual Host in the configuration file, like this:
                DirectoryIndex index.wsql
              </VirtualHost>
 
-Don't forget to adapt the path and your IP address, and probably the ServerName & CustomLog & ErrorLog keys too.
+Don't forget to adapt the path and your IP address, and probably the ServerName & CustomLog & ErrorLog directives too.
 
 Well that should do it. Restart your web server and try it out! Don't forget that you will need to restart Apache every time you change something in WeSQL.pl (which is basically hardly ever as the configuration in there is fairly static).
 
@@ -82,9 +82,9 @@ All the other documentation is in the man pages: Apache::WeSQL, Apache::WeSQL::D
 
 Do drop me a line at ward@pong.be about how you use WeSQL, and enjoy!
 Ward Vandewege,
-20.11.2001.
+2002.02.14
 
 COPYRIGHT AND LICENCE
 
-Copyright (c) 2000-2001 Ward Vandewege. This program is free software; you can redistribute it and/or modify it under the terms of the GPL.
+Copyright (c) 2000-2002 Ward Vandewege. This program is free software; you can redistribute it and/or modify it under the terms of the GPL.
 See the file COPYING in this directory for more information.

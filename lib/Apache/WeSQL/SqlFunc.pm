@@ -26,7 +26,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # Preloaded methods go here.
 
@@ -104,7 +104,12 @@ sub sqlExecuteInsert {
 		$logstr .= ")";
 		&Apache::WeSQL::log_error($logstr);
 	}
-
+	# We need to reassure that all @values items that contain non-digit characters are actually stored as strings.
+	# This is necessary for values like word.word which seem to be wrongly interpreted by the MySQL code as
+	# dbname.tablename without the following three lines. Why? Beats me. WVW, 2002-02-08
+	for (my $cnt = 0; $cnt < $#values; $cnt++) {
+		$values[$cnt] = "$values[$cnt]" if ($values[$cnt] =~ /\D/)
+	}
 	if(not $sth->execute(@values)) {
 		${$dbh}->rollback if ($dbtype);
 		&Apache::WeSQL::log_error("$$: sqlExecuteInsert: bad query: " . ${$dbh}->errstr);
@@ -347,12 +352,16 @@ Apache::WeSQL::SqlFunc - A library of functions to deal with the SQL database
 This module contains all functions necessary to deal with SQL databases in an easy way.
 You may call these functions directly from any WeSQL document.
 
+This module is part of the WeSQL package, version 0.51
+
+(c) 2000-2002 by Ward Vandewege
+
 =head2 EXPORT
 
 None by default. Possible:
   sqlConnect sqlDisconnect sqlSelect sqlSelectMany 
-  sqlPrepareInsert sqlExecuteInsert sqlInsert sqlInsertReturn
-  sqlUpdate sqlDelete sqlGeneric
+  sqlPrepareInsert sqlExecuteInsert sqlInsert 
+	sqlInsertReturn sqlUpdate sqlDelete sqlGeneric
 
 =head1 AUTHOR
 

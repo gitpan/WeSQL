@@ -1,0 +1,71 @@
+<html>
+<head>
+<title>WeSQL Upgrade Path</title>
+</head>
+<body bgcolor=#FFFFFF>
+<h1>WeSQL Upgrade Path</h1>
+<table width=800>
+<tr>
+<td>
+<b>v0.50 -> v0.51:</b><p>
+</td>
+</tr>
+<tr><td>
+<ol>
+<li>In your database, add (MySQL definition, see the Addressbook application for a PostgreSQL definition):
+<p>
+create table sessions (<br>
+&nbsp;&nbsp;pkey bigint(20) unsigned not null auto_increment,<br>
+&nbsp;&nbsp;id bigint(20) unsigned not null,<p>
+
+&nbsp;&nbsp;uid bigint(20) unsigned not null,<br>
+&nbsp;&nbsp;suid bigint(20) unsigned not null default '0',<br>
+&nbsp;&nbsp;epoch bigint unsigned not null,<br>
+&nbsp;&nbsp;status tinyint default '1' not null,<p>
+
+&nbsp;&nbsp;hash varchar(16) default '' not null,<br>
+&nbsp;&nbsp;primary key (pkey)<br>
+);<p>
+
+And execute:<p>
+
+alter table sessiondata change loginid sessionid bigint(20) unsigned not null;<p>
+
+Also, don't forget to make new copies for any copies of AppHandler.pm you have made!!
+<li>In the file(s) details.cf, replace all occurencies of $key by $data{key}. I've removed this extra bit of syntactic sugar to simplify things (and to sanitize them, as it only worked in details.cf, and not in the other .cf files).
+<li>Make sure to add something sensible for the following keys in the layout.cf file(s):<p>
+listform1<br>
+listform2<br>
+listform3<p>
+These are used in the login forms. The default values are:<p>
+loginform1<br>
+&lt;tr&gt;<br>
+&lt;td align=center valign=top&gt;<br>
+&lt;br&gt;<br>
+&lt;center&gt;<br>
+&lt;form action="jlogin.wsql" method=post&gt;<br>
+&lt;table width=400&gt;<br>
+&lt;tr&gt;&lt;td align=right&gt;&lt;b&gt;Login:&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;INPUT name="login"&gt;&lt;/td&gt;&lt;/tr&gt;<br>
+&lt;tr&gt;&lt;td align=right&gt;&lt;b&gt;Password:&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&lt;INPUT name="passwd" type=password&gt;&lt;/td&gt;&lt;/tr&gt;<br>
+&lt;tr&gt;&lt;td colspan=2 align=center&gt;<p>
+
+loginform2<br>
+&lt;input type="submit" value="Log in"&gt;&lt;/td&gt;&lt;/tr&gt;<p>
+
+loginform3<br>
+&lt;/table&gt;<br>
+&lt;/form&gt;<br>
+&lt;/td&gt;&lt;/tr&gt;<br>
+&lt;tr&gt;<br>
+&lt;td align=center&gt;<br>
+&lt;b&gt;If you get this page time and again, your browser does not support cookies.&lt;br&gt;Enable cookies and try again!&lt;/b&gt;<br>
+&lt;/td&gt;<br>
+&lt;/tr&gt;<br>
+&lt;/form&gt;<br>
+
+</pre>
+</ol>
+</td></tr>
+</table>
+</body>
+</html>

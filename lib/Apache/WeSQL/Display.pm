@@ -13,6 +13,7 @@ use CGI;
 use Apache::WeSQL;
 use Apache::WeSQL::SqlFunc qw(:all);
 use Apache::WeSQL::Journalled qw(:all);
+use Apache::WeSQL::Session qw(:all);
 
 use Apache::Constants qw(:common);
 require Exporter;
@@ -32,7 +33,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw( );
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # Preloaded methods go here.
 
@@ -46,7 +47,7 @@ sub jCheckParams {
 	my $ok = 1;
 	my $dd = localtime();
  	my $error .= <<"EOF";
-HTTP/1.0 200 OK
+HTTP/1.1 200 OK
 Date: $dd
 Server: Apache
 Connection: close
@@ -84,6 +85,7 @@ EOF
 ############################################################
 sub jForm {
 	my $dbh = shift;
+	my $cookieheader = shift;
 	my $body;
 	my %layout = &Apache::WeSQL::readLayoutFile("layout.cf");
 	&jCheckParams(('view'));	# First check that we have a view parameter!
@@ -91,14 +93,22 @@ sub jForm {
 	$data{recordsperpage} ||= 10;
 	my $new = ($Apache::WeSQL::params{$data{key}} ne "new"?0:1);
 	# editdest passed through URL has precedence over 'fallback' editdest in 'form.cf'
-	$Apache::WeSQL::params{editdest} = $data{editdest} if (defined($data{editdest}) && (!defined($Apache::WeSQL::params{editdest})));
-	&sOverWrite($dbh,"editdest$Apache::WeSQL::params{view}",&operaBugDecode($Apache::WeSQL::params{editdest})); # Store the editdest in the session
+	if (defined($data{editdest}) && (!defined($Apache::WeSQL::params{editdest}))) {
+		$Apache::WeSQL::params{editdest} = $data{editdest};
+	} elsif (!defined($Apache::WeSQL::params{editdest})) {	# Ultimate fallback is HTTP_REFERER when nothing is specified in the url nor .cf file
+		$Apache::WeSQL::params{editdest} = $ENV{HTTP_REFERER};
+	}
+	# Store the editdest in the session
+	&Apache::WeSQL::Session::sOverWrite($dbh,"editdest$Apache::WeSQL::params{view}",&operaBugDecode($Apache::WeSQL::params{editdest})); 
 	&jCheckParams(("$data{key}","editdest"));	# Now check the other prerequisites!
 	my $dd = localtime();
 	$body = <<EOF;
-HTTP/1.0 200 OK
+HTTP/1.1 200 OK
 Date: $dd
 Server: Apache
+EOF
+	$body .= "$cookieheader\r\n" if (defined($cookieheader) && ($cookieheader ne ''));
+	$body .= <<EOF;
 Connection: close
 Content-type: text/html
 
@@ -113,6 +123,7 @@ EOF
 	$body .= $layout{liststarttable1};
 	$body .= $data{title} if (defined($data{title}));
 	$body .= $layout{liststarttable2};
+	$body .= "<tr><td><table align=center>";
 	$body .= "$data{tableheader}" if (defined($data{tableheader}));
 
 	my $dbtype = 0; #MySQL
@@ -173,36 +184,40 @@ EOF
 				$formel .= qq|\n<tr>\n<td$align><b>$colname</b></td>\n<td$align>$value</td>\n</tr>|;
 			} elsif ($data{"form.$origcolname"} eq 'password') {
 				$formel = qq|\n<tr>\n<td$align><b>$colname</b></td>\n<td$align><input name="$origcolname" type=password size=40 value="$value"></td>\n</tr>|;
+			} elsif ($data{"form.$origcolname"} =~ /^textarea\((.*?)\)/i) {
+				$formel = qq|\n<tr>\n<td$align><b>$colname</b></td>\n<td$align><textarea name="$origcolname" $1>$value</textarea></td>\n</tr>|;
 			} elsif ($data{"form.$origcolname"} =~ /^select/i) {
 				$formel = qq|\n<tr>\n<td$align><b>$colname</b></td>\n<td$align><select name="$origcolname">\n|;
-				my ($parameters) = ($data{"form.$origcolname"} =~ /select\((.*?)\)/i);
-				if ($parameters =~ /^select /i) {
-					my @info = split(/\;/,$parameters,4);
-					my ($value) = ($info[2] =~ /value=(.*)/);
-					my ($show) = ($info[3] =~ /show=(.*)/);
-					my ($selectleft,$selectright) = split(/=/,$info[1]);
-					my $c = &sqlSelectMany($dbh,$info[0]);
-					while(my $selectrow=$c->fetchrow_hashref()) {
-						my $checkedstr = ""; 
-						$checkedstr = " SELECTED CHECKED" if ((${$selectrow}{$selectleft} eq $row[$cnt]) && !$new);
-						$checkedstr = " SELECTED CHECKED" if (defined($Apache::WeSQL::params{$origcolname}) && ($Apache::WeSQL::params{$origcolname} eq ${$selectrow}{$selectleft}) && $new);
-						my $tmp = "<option value=\"$value\"$checkedstr>$show</option>\n";
-						foreach (keys %{$selectrow}) {
-							$tmp =~ s/\#$_/${$selectrow}{$_}/g;
+				while ($data{"form.$origcolname"} =~ /select\((.*?)\)/ig) {
+					my $parameters = $1;
+					if ($parameters =~ /^select /i) {
+						my @info = split(/\;/,$parameters,4);
+						my ($value) = ($info[2] =~ /value=(.*)/);
+						my ($show) = ($info[3] =~ /show=(.*)/);
+						my ($selectleft,$selectright) = split(/=/,$info[1]);
+						my $c = &sqlSelectMany($dbh,$info[0]);
+						while(my $selectrow=$c->fetchrow_hashref()) {
+							my $checkedstr = ""; 
+							$checkedstr = " SELECTED CHECKED" if ((${$selectrow}{$selectleft} eq $row[$cnt]) && !$new);
+							$checkedstr = " SELECTED CHECKED" if (defined($Apache::WeSQL::params{$origcolname}) && ($Apache::WeSQL::params{$origcolname} eq ${$selectrow}{$selectleft}) && $new);
+							my $tmp = "<option value=\"$value\"$checkedstr>$show</option>\n";
+							foreach (keys %{$selectrow}) {
+								$tmp =~ s/\#$_/${$selectrow}{$_}/g;
+							}
+							$formel .= $tmp;
 						}
-						$formel .= $tmp;
+					} else {
+						my @parameters = split(/\,/,$parameters);
+						foreach (@parameters) {
+							my @tmp = split(/\=/,$_);
+							my $checkedstr = "";
+							if (($value eq $tmp[1]) ||
+									(defined($Apache::WeSQL::params{$origcolname}) && ($Apache::WeSQL::params{$origcolname} eq $tmp[1]))) {
+								$checkedstr = " SELECTED CHECKED";
+							}
+							$formel .= "<option value=\"$tmp[1]\"$checkedstr>$tmp[0]</option>\n";
+						}   
 					}
-				} else {
-					my @parameters = split(/\,/,$parameters);
-					foreach (@parameters) {
-						my @tmp = split(/\=/,$_);
-						my $checkedstr = "";
-						if (($value eq $tmp[1]) ||
-								(defined($Apache::WeSQL::params{$origcolname}) && ($Apache::WeSQL::params{$origcolname} eq $tmp[1]))) {
-							$checkedstr = " SELECTED CHECKED";
-						}
-						$formel .= "<option value=\"$tmp[1]\"$checkedstr>$tmp[0]</option>";
-					}   
 				}
 				$formel .= "</select></td>\n</tr>";
 			}
@@ -228,6 +243,7 @@ EOF
 	$body .= "</form>";
 
 	$body .= "$data{tablefooter}" if (defined($data{tablefooter}));
+	$body .= "</table></td></tr>";
 	$body .= $layout{liststoptable};
 
 	# And a page footer!
@@ -246,6 +262,7 @@ EOF
 ############################################################
 sub jDetails {
 	my $dbh = shift;
+	my $cookieheader = shift;
 	my $body;
 	my %layout = &Apache::WeSQL::readLayoutFile("layout.cf");
 	&jCheckParams(('view'));				# First check that we have a 'view' parameter!
@@ -258,14 +275,15 @@ sub jDetails {
 	if ($r->uri =~ /\/jdeleteform.wsql$/) {
 		# The default canceldest is back to where we came from
 		$Apache::WeSQL::params{canceldest} ||= $ENV{HTTP_REFERER};
-		&sOverWrite($dbh,"canceldest$Apache::WeSQL::params{view}",operaBugDecode($Apache::WeSQL::params{canceldest}));	# Store the canceldest in the session
+		&Apache::WeSQL::Session::sOverWrite($dbh,"canceldest$Apache::WeSQL::params{view}",operaBugDecode($Apache::WeSQL::params{canceldest}));	# Store the canceldest in the session
 		# The default deldest is less sensible than the default canceldest: 
 		# the root of the web server. This should really be set on a case by case basis
 		$Apache::WeSQL::params{deldest} ||= '/';
 		# Store the deldest in the session, if there is none stored there!
-		&sOverWrite($dbh,"deldest$Apache::WeSQL::params{view}",operaBugDecode($Apache::WeSQL::params{deldest}));
+		&Apache::WeSQL::Session::sOverWrite($dbh,"deldest$Apache::WeSQL::params{view}",operaBugDecode($Apache::WeSQL::params{deldest}));
 	  $data{append} = <<"EOF" 
 <center>
+&nbsp;<br>
 Are you <b>sure</b> you want to delete this entry?<br>
 <form action=jdelete.wsql method=get>
 <input type=hidden name=$data{key} value="$Apache::WeSQL::params{$data{key}}">
@@ -281,9 +299,12 @@ EOF
 	&jCheckParams(("$data{key}"));	# Now check the other prerequisites!
 	my $dd = localtime();
 	$body = <<EOF;
-HTTP/1.0 200 OK
+HTTP/1.1 200 OK
 Date: $dd
 Server: Apache
+EOF
+	$body .= "$cookieheader\r\n" if (defined($cookieheader) && ($cookieheader ne ''));
+	$body .= <<EOF;
 Connection: close
 Content-type: text/html
 
@@ -297,14 +318,14 @@ EOF
 	$body .= $layout{liststarttable1};
 	$body .= $data{title} if (defined($data{title}));
 	$body .= $layout{liststarttable2};
+	$body .= "<tr><td><table align=center>";
 	$body .= "$data{tableheader}" if (defined($data{tableheader}));
 
 	my $dbtype = 0; #MySQL
 	$dbtype = 1 if (${$dbh}->{Driver}->{Name} =~ /^Pg/);
 
 	my $query = $data{query} . " limit 1";
-	# Replace $key and possible $Apache::WeSQL::params variables in the query!
-	$query =~ s/\$key/$data{key}/eg;
+	# Replace possible $Apache::WeSQL::params variables in the query!
 	$query =~ s/\$Apache::WeSQL::params{(.*?)}/$Apache::WeSQL::params{$1}/eg;
 
 	# See which columns we are to hide
@@ -314,7 +335,7 @@ EOF
 	foreach (@tmp) {
 		$hide{$_} = $_;
 	}
-
+	
 	my $c = &sqlSelectMany($dbh,$query);
 	my $colnameref = $c->{NAME_lc};
 	my @row = $c->fetchrow_array;
@@ -331,6 +352,9 @@ EOF
 		my $align = "";
 		$align = ' align=' . $data{"align.$colname"} if (defined($data{"align.$colname"}));
 		my $value = $row[$cnt];
+		# Set $print to 1 if the 'hideifdefault' condition is not met and we should print the record
+		my $print = 0;
+		$print = 1 if (!defined($data{"hideifdefault.$colname"}) || ($data{"hideifdefault.$colname"} ne $value));
 		# See if we need to insert a replacement!
 		if (defined($data{"replace.$colname"})) {
 			my $tmp = $data{"replace.$colname"};
@@ -343,9 +367,11 @@ EOF
 			$tmp = &select_replacement($1,$row[$cnt]) if ($tmp =~ /^select\((.*?)\)/);
 			$value = $tmp;
 		}
-		$colname = $data{"captions.$colname"} if (defined($data{"captions.$colname"}));
-		# And finally add the correct line to the output!
-		$body .= "\n<tr>\n<td$align><b>$colname</b></td>\n<td$align>$value</td>\n</tr>" if (!defined($hide{${$colnameref}[$cnt]}));
+		# And finally add the correct line to the output - if we may!
+		if  (!defined($hide{${$colnameref}[$cnt]}) && $print) {
+			$colname = $data{"captions.$colname"} if (defined($data{"captions.$colname"}));
+			$body .= "\n<tr>\n<td$align><b>$colname</b></td>\n<td$align>$value</td>\n</tr>";
+		}
 	}
 	$c->finish();
 
@@ -354,6 +380,7 @@ EOF
 	$body .= "</td></tr><tr><td colspan=2>$data{append}</td></tr>" if (defined($data{append}));
 
 	$body .= "$data{tablefooter}" if (defined($data{tablefooter}));
+	$body .= "</table></td></tr>";
 	$body .= $layout{liststoptable};
 
 	# And a page footer!
@@ -417,6 +444,7 @@ sub select_replacement {
 sub jList {
 	my $dbh = shift;
 	my $inline = shift;		# Set to 1 if called 'inline', inserted from another view (typically /jdetails)
+	my $cookieheader = shift;
 	$inline ||= 0;
 	my $body;
 	my %layout = &Apache::WeSQL::readLayoutFile("layout.cf");
@@ -427,9 +455,12 @@ sub jList {
 	my $dd = localtime();
 	if (!$inline) {
 		$body = <<EOF;
-HTTP/1.0 200 OK
+HTTP/1.1 200 OK
 Date: $dd
 Server: Apache
+EOF
+		$body .= "$cookieheader\r\n" if (defined($cookieheader) && ($cookieheader ne ''));
+		$body .= <<EOF;
 Connection: close
 Content-type: text/html
 
@@ -520,7 +551,11 @@ EOF
 		$body .= "</td></tr><tr><td colspan=$visiblecols" . 
 							">$data{appendresults}</td></tr>" if (defined($data{appendresults}));
 	} else {
-		$body .= "</td></tr><tr><td>$data{appendnoresults}</td></tr>" if (defined($data{appendnoresults}));
+		if (defined($data{appendnoresults})) {
+			$body .= "</td></tr><tr><td>$data{appendnoresults}</td></tr>";
+		} else {
+			$body .= "</td></tr><tr><td align=center>No results!</td></tr>";
+		}
 	}
 
 	$body .= "$data{tablefooter}" if (defined($data{tablefooter}));
@@ -791,6 +826,20 @@ pagefooter:<center>some view-specific footer</center><br>
 
 =back
 
+=head2 editdest (form.cf)
+
+Provides a default 'editdest' for a view. That is the destination the user will be redirected to after (s)he clicks on the button.
+
+=over 4
+
+=item
+Example:
+
+=item
+editdest:index.wsql
+
+=back
+
 =head2 recordsperpage (list.cf)
 
 Controls how many records are shown per page (with the rest being accessible through an automatically generated system of 'next' and 'previous' links). Default: 10.
@@ -833,6 +882,28 @@ appendnoresults:<center>some text to add if there are results</center>
 
 =back
 
+=head2 hideifdefault (details.cf)
+
+Columns to hide in the listing, if they match a default value.
+
+syntax: hideifdefault:<colname>=<defaultvalue>
+
+<colname> is the name of a column returned from the sql-select querey, as returned by the database.
+<defaultvalue> is the default value that, if matched, will prevent the column from being printed.
+
+=over 4
+
+=item
+Example:
+
+=item
+hideifdefault:url=
+
+=item
+hideifdefault:publishdate=0
+
+=back
+
 =head2 hide (details.cf, list.cf)
 
 Columns to hide in the listing.
@@ -864,11 +935,27 @@ key:id
 =head2 form (form.cf)
 
 Allows to set the form element. The default type for each column is 'textbox'. Other options 
-include 'hidden', 'password', 'select', 'onlyshow' and 'showandhidden'. The first three of these
+include 'hidden', 'password', 'select', 'textarea', 'onlyshow' and 'showandhidden'. The first four of these
 options are standard html form elements. 'onlyshow' will not make a form element but only display
 the value of the column in the table. 'showandhidden' is basically a non-editable field in the
 table: the value is show, but there is also a hidden form element that will assure that it is
 passed to the form action script.
+
+The 'textarea' form element has some extra possible syntax. In it's simplest form, it looks like this:
+
+form:status=textarea()
+
+Which will result in the following html:
+
+<textarea name=status>value_of_status</textarea>
+
+However, between the two brackets you may supply options that will be inserted in the textarea tag, like this:
+
+form:status=textarea(cols=50 rows=10 break=hard)
+
+This would result in:
+
+<textarea name=status cols=50 rows=10 break=hard>value_of_status</textarea>
 
 The 'select' form element is a special one. You can select a limited number of options like this:
 
@@ -879,6 +966,12 @@ or rather use an sql query to supply the options, like this:
 form:peopleid=select(select id,firstname,lastname from people where status='1';id=peopleid;value=#id;show=#firstname #lastname)
 
 As you can see, there are 4 paramaters between the select brackets. They are separated by semicolons. The first one is the sql-query (which has to start with 'select '!). The second parameter indicates which column from the query corresponds to the value of the form element. This is used to select the correct value in the dropdown list by default. The third parameter is what will be used as the 'value' of the select option tag. Note that you can refer to values of the query by preceding their name with a hash (#). The last parameter is what will be shown on the screen in the dropdown box. In this case, two columns are combined. 
+
+You can put more than one select() statement in such a form: line, like this (new from v0.51):
+
+form:peopleid=select(John Miles=12,Larry Wall=13);select(select id,firstname,lastname from people where status='1';id=peopleid;value=#id;show=#firstname #lastname)
+
+This will result in 2 fixed people in the list, followed by whoever is stored in the database.
 
 =over 4
 
@@ -1173,6 +1266,10 @@ If you want to do away with this key, just define it in the layout.cf file and g
 WeSQL.pm exports a sub called readLayoutFile, which returns a hash with all the layout
 elements. Also, you can use <!-- LAYOUT TAG --> style tags in your .wsql files, where
 TAG is the name of the key from the layout file that you want to include in a wsql file.
+
+This module is part of the WeSQL package, version 0.51
+
+(c) 2000-2002 by Ward Vandewege
 
 =head1 EXPORT
 

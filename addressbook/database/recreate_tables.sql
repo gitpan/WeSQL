@@ -12,6 +12,19 @@ create table logins (
 	primary key (pkey)
 );
 
+create table sessions (
+	pkey bigint(20) unsigned not null auto_increment,
+	id bigint(20) unsigned not null,
+
+	uid bigint(20) unsigned not null,
+	suid bigint(20) unsigned not NULL default '0',
+	epoch bigint unsigned not null,
+	status tinyint default '1' NOT NULL,
+
+	hash varchar(16) default '' not null,
+	primary key (pkey)
+);
+
 create table sessiondata (
 	pkey bigint(20) unsigned not null auto_increment,
 	id bigint(20) unsigned not null,
@@ -21,7 +34,7 @@ create table sessiondata (
 	epoch bigint unsigned not null,
 	status tinyint default '1' NOT NULL,
 
-	loginid bigint(20) unsigned not null,
+	sessionid bigint(20) unsigned not null,
 	name varchar(50) default '' not null,
 	value varchar(255) default '' not null,
 	primary key (pkey)
